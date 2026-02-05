@@ -225,11 +225,12 @@
         .content-header-logo {
             max-width: 200px;
             height: auto;
-            background-color: transparent;
+            background: transparent !important;
             mix-blend-mode: multiply;
-            padding: 10px 15px;
-            border-radius: 12px;
+            padding: 0;          /* ✅ 핵심 수정 */
+            border-radius: 0;     /* ✅ 핵심 수정 */
         }
+
         .content-header h1 {
             font-size: 32px;
             color: var(--primary);
