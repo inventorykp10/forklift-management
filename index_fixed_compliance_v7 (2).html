@@ -3997,8 +3997,7 @@ class DataManager {
                 const set = new Set();
                 (dataManager.data.operators || []).forEach(o => {
                     const nm = normalizeName(o.name || '');
-                    const grp = (o.group || '').toLowerCase();
-                    if (nm && grp.includes('bankstown')) set.add(nm);
+                    if (nm) set.add(nm);
                 });
                 return set;
             };

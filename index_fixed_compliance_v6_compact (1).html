@@ -3867,10 +3867,12 @@ class DataManager {
                 const dd = String(d.getDate()).padStart(2, '0');
                 return `${yyyy}-${mm}-${dd}`; // ISO
             });
-            const [selectedShift, setSelectedShift] = useState('ALL');
+            const [selectedShift, setSelectedShift] = useState('AM');
             const [endDate, setEndDate] = useState(() => selectedDate);
             const [activeDate, setActiveDate] = useState(() => selectedDate);
-            const [listView, setListView] = useState('ALL');
+            const [listView, setListView] = useState('MISSING');
+            const [modalOpen, setModalOpen] = useState(false);
+            const [modalView, setModalView] = useState('MISSING');
             const [attendanceRecords, setAttendanceRecords] = useState(() => {
                 try {
                     return JSON.parse(localStorage.getItem('forklift_attendance_records') || '[]');
@@ -3887,7 +3889,7 @@ class DataManager {
             }, [selectedDate]);
 
             useEffect(() => {
-                setListView('ALL');
+                setListView('MISSING');
             }, [selectedShift, endDate]);
 
             const normalizeName = (s) => {
@@ -3997,8 +3999,7 @@ class DataManager {
                 const set = new Set();
                 (dataManager.data.operators || []).forEach(o => {
                     const nm = normalizeName(o.name || '');
-                    const grp = (o.group || '').toLowerCase();
-                    if (nm && grp.includes('bankstown')) set.add(nm);
+                    if (nm) set.add(nm);
                 });
                 return set;
             };
@@ -4081,6 +4082,13 @@ class DataManager {
                 return titleCase(raw);
             };
 
+            const openListModal = (view) => {
+                setModalView(view);
+                setModalOpen(true);
+            };
+
+            const closeListModal = () => setModalOpen(false);
+
             const isSubmittedForActiveDate = (normalizedName) => {
                 const list = active?.submittedList || [];
                 return list.includes(normalizedName);
@@ -4124,8 +4132,8 @@ return (
                 <div>
                     <div className="content-header">
                         <div className="content-header-left">
-                            <h1>Compliance <span className="v3-badge">V7</span></h1>
-                            <p>Attendance vs checklist submission</p>
+                            <h1>Compliance <span className="v3-badge">V6</span></h1>
+                            <p>Attendance vs checklist submission (by date + shift)</p>
                         </div>
                         <div className="content-header-right">
                             <button className="btn btn-secondary" onClick={handleImportClick}>📥 Import Attendance</button>
@@ -4135,7 +4143,7 @@ return (
 
                     <div className="table-card">
                         <div style={{padding:'15px 20px'}}>
-                            {/* Row 1: Title + Filters inline */}
+                            {/* Row 1: Filters - all inline compact */}
                             <div style={{display:'flex', alignItems:'center', flexWrap:'wrap', gap:'10px', marginBottom:'12px'}}>
                                 <h3 style={{margin:0, marginRight:'auto'}}>Status & Submission</h3>
                                 <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
@@ -4143,188 +4151,167 @@ return (
                                     <input type="date" value={selectedDate} onChange={(e)=>setSelectedDate(e.target.value)} style={{padding:'4px 6px', fontSize:'13px', border:'1px solid #dfe6e9', borderRadius:'6px'}} />
                                     <label style={{fontSize:'12px', color:'#7f8c8d', fontWeight:600, margin:0}}>To</label>
                                     <input type="date" value={endDate} onChange={(e)=>setEndDate(e.target.value)} style={{padding:'4px 6px', fontSize:'13px', border:'1px solid #dfe6e9', borderRadius:'6px'}} />
-                                    <select value={selectedShift} onChange={(e)=>setSelectedShift(e.target.value)} style={{padding:'4px 8px', fontSize:'13px', border:'1px solid #dfe6e9', borderRadius:'6px', fontWeight:600}}>
-                                        <option value="ALL">All</option>
+                                    <select value={selectedShift} onChange={(e)=>setSelectedShift(e.target.value)} style={{padding:'4px 8px', fontSize:'13px', border:'1px solid #dfe6e9', borderRadius:'6px'}}>
                                         <option value="AM">AM</option>
                                         <option value="PM">PM</option>
+                                        <option value="ALL">All</option>
                                     </select>
                                 </div>
                             </div>
 
-                            {/* Row 2: Compact stat pills - clickable to toggle inline list */}
-                            <div style={{display:'flex', gap:'10px', marginBottom:'0'}}>
-                                {[
-                                    {key:'ALL', label:'Present', count: presentCount, icon:'👥', bg:'#f0f7ff', border:'#d6e8f7', labelColor:'#5a7fa0'},
-                                    {key:'SUBMITTED', label:'Submitted', count: submittedCount, icon:'✅', bg:'#f0faf0', border:'#c8e6c9', labelColor:'#388e3c'},
-                                    {key:'MISSING', label:'Missing', count: missingCount, icon: missingCount > 0 ? '🚨' : '✅', bg: missingCount > 0 ? '#fff5f5' : '#f0faf0', border: missingCount > 0 ? '#ffcdd2' : '#c8e6c9', labelColor: missingCount > 0 ? '#c62828' : '#388e3c'}
-                                ].map(pill => (
-                                    <div key={pill.key}
-                                        onClick={() => setListView(listView === pill.key ? null : pill.key)}
-                                        style={{
-                                            flex:1, display:'flex', alignItems:'center', justifyContent:'space-between',
-                                            padding:'10px 14px', background: listView === pill.key ? pill.bg : '#fafafa',
-                                            borderRadius:'10px', cursor:'pointer',
-                                            border: listView === pill.key ? `2px solid ${pill.border}` : '1px solid #e9ecef',
-                                            transition:'all 0.15s', position:'relative'
-                                        }}>
-                                        <div>
-                                            <div style={{fontSize:'11px', color: pill.labelColor, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.5px'}}>{pill.label}</div>
-                                            <div style={{fontSize:'24px', fontWeight:800, color:'#2c3e50', lineHeight:'1.1'}}>{pill.count}</div>
-                                        </div>
-                                        <div style={{fontSize:'20px'}}>{pill.icon}</div>
+                            {/* Row 2: Compact stat pills - clickable */}
+                            <div style={{display:'flex', gap:'10px', marginBottom: (endDate && endDate !== selectedDate) ? '12px' : '0'}}>
+                                <div onClick={() => openListModal('ALL')} style={{flex:1, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 16px', background:'#f0f7ff', borderRadius:'10px', cursor:'pointer', border:'1px solid #d6e8f7', transition:'all 0.15s'}}>
+                                    <div>
+                                        <div style={{fontSize:'11px', color:'#5a7fa0', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.5px'}}>Present</div>
+                                        <div style={{fontSize:'26px', fontWeight:800, color:'#2c3e50', lineHeight:'1.1'}}>{presentCount}</div>
                                     </div>
-                                ))}
+                                    <div style={{fontSize:'22px'}}>👥</div>
+                                </div>
+                                <div onClick={() => openListModal('SUBMITTED')} style={{flex:1, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 16px', background:'#f0faf0', borderRadius:'10px', cursor:'pointer', border:'1px solid #c8e6c9', transition:'all 0.15s'}}>
+                                    <div>
+                                        <div style={{fontSize:'11px', color:'#388e3c', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.5px'}}>Submitted</div>
+                                        <div style={{fontSize:'26px', fontWeight:800, color:'#2c3e50', lineHeight:'1.1'}}>{submittedCount}</div>
+                                    </div>
+                                    <div style={{fontSize:'22px'}}>✅</div>
+                                </div>
+                                <div onClick={() => openListModal('MISSING')} style={{flex:1, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 16px', background: missingCount > 0 ? '#fff5f5' : '#f0faf0', borderRadius:'10px', cursor:'pointer', border: missingCount > 0 ? '1px solid #ffcdd2' : '1px solid #c8e6c9', transition:'all 0.15s'}}>
+                                    <div>
+                                        <div style={{fontSize:'11px', color: missingCount > 0 ? '#c62828' : '#388e3c', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.5px'}}>Missing</div>
+                                        <div style={{fontSize:'26px', fontWeight:800, color: missingCount > 0 ? '#c62828' : '#2c3e50', lineHeight:'1.1'}}>{missingCount}</div>
+                                    </div>
+                                    <div style={{fontSize:'22px'}}>{missingCount > 0 ? '🚨' : '✅'}</div>
+                                </div>
                             </div>
+
+                            {/* Range summary table (only when date range selected) */}
+                            {(endDate && endDate !== selectedDate) && (
+                                <div style={{border:'1px solid #e9ecef', borderRadius:'8px', overflow:'hidden'}}>
+                                    <div style={{padding:'8px 12px', background:'#f8f9fa', fontSize:'13px', fontWeight:600, color:'#2c3e50'}}>Range Summary</div>
+                                    <div className="table-wrapper">
+                                        <table className="data-table" style={{marginBottom:0}}>
+                                            <thead>
+                                                <tr>
+                                                    <th>Date</th>
+                                                    <th>Present</th>
+                                                    <th>Submitted</th>
+                                                    <th>Missing</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {rangeStats.map(r => (
+                                                    <tr key={r.date} style={{cursor:'pointer'}} onClick={() => setActiveDate(r.date)}>
+                                                        <td><strong>{r.date}</strong>{r.date === activeDate ? ' ✅' : ''}</td>
+                                                        <td>{r.presentOperatorsCount}</td>
+                                                        <td>{r.submittedCount}</td>
+                                                        <td style={{color: r.missingCount > 0 ? '#c62828' : 'inherit', fontWeight: r.missingCount > 0 ? 700 : 400}}>{r.missingCount}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
-                        {/* Range summary table (only when date range) */}
-                        {(endDate && endDate !== selectedDate) && (
-                            <div style={{margin:'0 20px 10px', border:'1px solid #e9ecef', borderRadius:'8px', overflow:'hidden'}}>
-                                <div style={{padding:'8px 12px', background:'#f8f9fa', fontSize:'13px', fontWeight:600, color:'#2c3e50'}}>Range Summary</div>
-                                <div className="table-wrapper">
-                                    <table className="data-table" style={{marginBottom:0}}>
-                                        <thead>
-                                            <tr>
-                                                <th>Date</th>
-                                                <th>Present</th>
-                                                <th>Submitted</th>
-                                                <th>Missing</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {rangeStats.map(r => (
-                                                <tr key={r.date} style={{cursor:'pointer'}} onClick={() => setActiveDate(r.date)}>
-                                                    <td><strong>{r.date}</strong>{r.date === activeDate ? ' ✅' : ''}</td>
-                                                    <td>{r.presentOperatorsCount}</td>
-                                                    <td>{r.submittedCount}</td>
-                                                    <td style={{color: r.missingCount > 0 ? '#c62828' : 'inherit', fontWeight: r.missingCount > 0 ? 700 : 400}}>{r.missingCount}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                        {modalOpen && (
+                            <div className="modal-overlay" onClick={closeListModal}>
+                                <div className="modal-content" onClick={(e)=>e.stopPropagation()} style={{maxWidth:'900px'}}>
+                                    <div className="modal-header">
+                                        <h2 style={{margin:0, fontSize:'18px'}}>
+                                            {modalView === 'MISSING' ? 'Missing Operators' : modalView === 'SUBMITTED' ? 'Submitted Operators' : 'All Attendance (present operators)'}
+                                        </h2>
+                                        <button className="close-btn" onClick={closeListModal}>&times;</button>
+                                    </div>
+                                    <div className="modal-body">
+                                        {modalView === 'MISSING' && (
+                                            missingCount === 0 ? (
+                                                <div style={{color:'#27ae60'}}>✅ No missing submissions for selected date/shift.</div>
+                                            ) : (
+                                                <div className="table-wrapper">
+                                                    <table className="data-table">
+                                                        <thead>
+                                                            <tr>
+                                                                <th style={{width:'60px'}}>#</th>
+                                                                <th>Name</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {(active.missing || []).map((n, i) => (
+                                                                <tr key={n} style={{backgroundColor:'#ffebee'}}>
+                                                                    <td><strong>{i+1}</strong></td>
+                                                                    <td style={{color:'#c62828', fontWeight:700}}>{displayName(n)}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            )
+                                        )}
+
+                                        {modalView === 'SUBMITTED' && (
+                                            (active.submittedList && active.submittedList.length > 0) ? (
+                                                <div className="table-wrapper">
+                                                    <table className="data-table">
+                                                        <thead>
+                                                            <tr>
+                                                                <th style={{width:'60px'}}>#</th>
+                                                                <th>Name</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {active.submittedList.map((n, i) => (
+                                                                <tr key={n}>
+                                                                    <td><strong>{i+1}</strong></td>
+                                                                    <td style={{fontWeight:600}}>{displayName(n)}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            ) : (
+                                                <div style={{color:'#7f8c8d'}}>No submitted checklists for selected date/shift.</div>
+                                            )
+                                        )}
+
+                                        {modalView === 'ALL' && (
+                                            <div className="table-wrapper">
+                                                <table className="data-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th style={{width:'60px'}}>#</th>
+                                                            <th>Name</th>
+                                                            <th style={{width:'140px'}}>Status</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {(() => {
+                                                            const all = Array.from(getPresentFromAttendance(active.date));
+                                                            // present operators only (intersect with operators)
+                                                            const presentOps = Array.from(intersectSets(new Set(all), operatorSet)).sort();
+                                                            return presentOps.map((n, i) => {
+                                                                const submitted = isSubmittedForActiveDate(n);
+                                                                return (
+                                                                    <tr key={n} style={{backgroundColor: submitted ? '#e8f5e9' : '#ffebee'}}>
+                                                                        <td><strong>{i+1}</strong></td>
+                                                                        <td style={{fontWeight:600}}>{displayName(n)}</td>
+                                                                        <td>
+                                                                            <span className={submitted ? 'badge success' : 'badge danger'}>
+                                                                                {submitted ? 'Submitted' : 'Missing'}
+                                                                            </span>
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            });
+                                                        })()}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         )}
-
-                        {/* Inline operator list below stat cards */}
-                        {listView && (() => {
-                            // Build rows with operator details
-                            const operatorMap = new Map();
-                            (dataManager.data.operators || []).forEach(o => {
-                                operatorMap.set(normalizeName(o.name || ''), o);
-                            });
-
-                            // Get checklist info for this date+shift to extract Unit, Department, Shift
-                            const checklistMap = new Map();
-                            (dataManager.data.checklists || []).forEach(c => {
-                                const d = (c.date || '').toString().trim();
-                                let iso = '';
-                                if (/^\d{4}-\d{2}-\d{2}$/.test(d)) iso = d;
-                                else {
-                                    const m2 = d.match(/^(\d{2})-(\d{2})-(\d{4})$/);
-                                    if (m2) iso = `${m2[3]}-${m2[2]}-${m2[1]}`;
-                                }
-                                if (iso === active.date) {
-                                    const cshift = String(c.shift || '').toUpperCase();
-                                    const wanted = selectedShift.toUpperCase();
-                                    if (wanted === 'ALL' || cshift === wanted) {
-                                        const key = normalizeName(c.operator || '');
-                                        if (key) checklistMap.set(key, c);
-                                    }
-                                }
-                            });
-
-                            let names = [];
-                            let listTitle = '';
-                            let listColor = '#2c3e50';
-
-                            if (listView === 'MISSING') {
-                                names = (active.missing || []);
-                                listTitle = `Missing Operators (${names.length})`;
-                                listColor = '#c62828';
-                            } else if (listView === 'SUBMITTED') {
-                                names = (active.submittedList || []);
-                                listTitle = `Submitted Operators (${names.length})`;
-                                listColor = '#27ae60';
-                            } else {
-                                const allPresent = Array.from(getPresentFromAttendance(active.date));
-                                names = Array.from(intersectSets(new Set(allPresent), operatorSet)).sort();
-                                listTitle = `All Present Operators (${names.length})`;
-                                listColor = '#2c3e50';
-                            }
-
-                            const rows = names.map(n => {
-                                const op = operatorMap.get(n) || {};
-                                const cl = checklistMap.get(n) || {};
-                                const sub = (active.submittedList || []).includes(n);
-                                return {
-                                    name: displayName(n),
-                                    unit: cl.unitNo || '-',
-                                    department: cl.department || op.group || '-',
-                                    shift: cl.shift || '-',
-                                    status: sub ? 'Submitted' : 'Missing',
-                                    normalized: n
-                                };
-                            });
-
-                            const exportToExcel = () => {
-                                const header = ['#', 'Operator', 'Unit', 'Department', 'Shift', 'Status'];
-                                const data = rows.map((r, i) => [i+1, r.name, r.unit, r.department, r.shift, r.status]);
-                                const ws = XLSX.utils.aoa_to_sheet([header, ...data]);
-                                ws['!cols'] = [{wch:5},{wch:25},{wch:12},{wch:20},{wch:8},{wch:12}];
-                                const wb = XLSX.utils.book_new();
-                                XLSX.utils.book_append_sheet(wb, ws, listView);
-                                XLSX.writeFile(wb, `Compliance_${listView}_${active.date}_${selectedShift}.xlsx`);
-                            };
-
-                            return (
-                                <div style={{borderTop:'1px solid #e9ecef'}}>
-                                    <div style={{padding:'12px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', background:'#f8f9fa'}}>
-                                        <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
-                                            <span style={{fontWeight:700, fontSize:'14px', color: listColor}}>{listTitle}</span>
-                                            <span style={{fontSize:'11px', color:'#7f8c8d', background:'#e9ecef', padding:'2px 8px', borderRadius:'10px'}}>{active.date} · {selectedShift}</span>
-                                        </div>
-                                        <button onClick={exportToExcel} style={{padding:'5px 14px', fontSize:'12px', background:'#27ae60', color:'white', border:'none', borderRadius:'6px', cursor:'pointer', fontWeight:600}}>
-                                            📥 Export Excel
-                                        </button>
-                                    </div>
-                                    {rows.length === 0 ? (
-                                        <div style={{padding:'20px', textAlign:'center', color:'#7f8c8d'}}>No records found</div>
-                                    ) : (
-                                        <div className="table-wrapper" style={{maxHeight:'50vh', overflowY:'auto'}}>
-                                            <table className="data-table" style={{marginBottom:0, fontSize:'13px', tableLayout:'fixed', width:'100%'}}>
-                                                <thead style={{position:'sticky', top:0, zIndex:1}}>
-                                                    <tr>
-                                                        <th style={{width:'5%'}}>#</th>
-                                                        <th style={{width:'28%'}}>Operator</th>
-                                                        <th style={{width:'14%'}}>Unit</th>
-                                                        <th style={{width:'28%'}}>Department</th>
-                                                        <th style={{width:'10%'}}>Shift</th>
-                                                        <th style={{width:'15%'}}>Status</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {rows.map((r, i) => (
-                                                        <tr key={r.normalized}>
-                                                            <td style={{color:'#adb5bd'}}>{i+1}</td>
-                                                            <td style={{fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{r.name}</td>
-                                                            <td>{r.unit}</td>
-                                                            <td style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{r.department}</td>
-                                                            <td>{r.shift}</td>
-                                                            <td>
-                                                                <span style={{fontSize:'11px', fontWeight:700, color: r.status === 'Submitted' ? '#27ae60' : '#c62828', background: r.status === 'Submitted' ? '#e8f5e9' : '#ffebee', padding:'3px 8px', borderRadius:'10px'}}>
-                                                                    {r.status}
-                                                                </span>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })()}
                     </div>
                 </div>
             );
