@@ -3190,6 +3190,32 @@ class DataManager {
             };
 
             const handleSave = (checklistData) => {
+                // Check if operator exists in the operators list
+                const operatorName = checklistData.operator?.trim();
+                if (operatorName) {
+                    const existingOperator = dataManager.data.operators.find(
+                        op => op.name.toLowerCase() === operatorName.toLowerCase()
+                    );
+                    
+                    // If operator doesn't exist, add them automatically
+                    if (!existingOperator) {
+                        const newOperator = {
+                            name: operatorName,
+                            licenseNo: 'TBA',
+                            department: checklistData.department || '',
+                            validFrom: new Date().toISOString().split('T')[0],
+                            licenseExpiry: '',
+                            classes: 'LO',
+                            hireDate: new Date().toISOString().split('T')[0],
+                            status: 'Active'
+                        };
+                        
+                        dataManager.addOperator(newOperator);
+                        console.log('✅ New operator added:', operatorName);
+                    }
+                }
+                
+                // Save checklist
                 if (editingChecklist) {
                     dataManager.updateChecklist(editingChecklist.id, checklistData);
                 } else {
