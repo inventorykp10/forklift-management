@@ -3122,7 +3122,7 @@ class DataManager {
                 }
             };
 
-            const handleSave = async (checklistData) => {
+            const handleSave = async (checklistData, saveAndContinue = false) => {
                 // Check if operator exists in the operators list
                 const operatorName = checklistData.operator?.trim();
                 if (operatorName) {
@@ -3201,7 +3201,17 @@ class DataManager {
                     dataManager.addChecklist(checklistData);
                 }
                 setChecklists([...dataManager.data.checklists]);
-                setShowModal(false);
+                
+                // If Save & Next was clicked, keep modal open and reset form
+                if (saveAndContinue) {
+                    setEditingChecklist(null);
+                    // Modal will automatically reset to empty form because editingChecklist is now null
+                    // Force re-render by closing and reopening
+                    setShowModal(false);
+                    setTimeout(() => setShowModal(true), 10);
+                } else {
+                    setShowModal(false);
+                }
             };
 
             return (
@@ -3405,7 +3415,7 @@ class DataManager {
                 repairAction: ''
             });
 
-            const handleSubmit = (e) => {
+            const handleSubmit = (e, saveAndContinue = false) => {
                 e.preventDefault();
                 
                 // Validation
@@ -3422,7 +3432,7 @@ class DataManager {
                     return;
                 }
                 
-                onSave(formData);
+                onSave(formData, saveAndContinue);
             };
 
             const handleResultChange = (result) => {
@@ -3628,7 +3638,10 @@ class DataManager {
                             </div>
                             <div className="modal-footer">
                                 <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
-                                <button type="submit" className="btn btn-success">{checklist ? 'Update' : 'Add'} Checklist</button>
+                                {!checklist && (
+                                    <button type="button" className="btn btn-primary" onClick={(e) => handleSubmit(e, true)}>💾 Save & Next</button>
+                                )}
+                                <button type="submit" className="btn btn-success">{checklist ? '✓ Update' : '✓ Close'}</button>
                             </div>
                         </form>
                     </div>
