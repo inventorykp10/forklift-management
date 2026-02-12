@@ -1924,19 +1924,6 @@ class DataManager {
                         </div>
                     </div>
 
-                    <div className="activity-section">
-                        <h3 style={{marginBottom: '15px'}}>📋 Recent Activity</h3>
-                        {recentActivity.length > 0 ? (
-                            recentActivity.map(log => (
-                                <div key={log.id} className="activity-item">
-                                    <strong>{log.timestamp}</strong> - {log.action}: {log.details}
-                                </div>
-                            ))
-                        ) : (
-                            <div style={{color: '#7f8c8d'}}>No recent activity</div>
-                        )}
-                    </div>
-
                     <div className="alerts-section">
                         <h3 style={{marginBottom: '15px'}}>⚠️ Important Alerts</h3>
                         {expiredLicenses.length > 0 && (
@@ -3210,11 +3197,11 @@ class DataManager {
                                         <th style={{width: '110px'}}>Date</th>
                                         <th style={{width: '90px'}}>Unit</th>
                                         <th style={{width: '150px'}}>Operator</th>
-                                        <th style={{width: '100px'}}>Department</th>
+                                        <th style={{width: '130px'}}>Department</th>
                                         <th style={{width: '80px'}}>Shift</th>
                                         <th style={{width: '100px'}}>Result</th>
-                                        <th style={{width: '160px'}}>Issue Description</th>
-                                        <th style={{width: '100px'}}>Required Action</th>
+                                        <th style={{width: '120px'}}>Issue Description</th>
+                                        <th style={{width: '150px'}}>Required Action</th>
                                         <th style={{width: '120px'}}>Actions</th>
                                     </tr>
                                 </thead>
