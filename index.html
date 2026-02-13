@@ -2081,7 +2081,8 @@ class DataManager {
                                         <th style={{width: '100px'}}>Log No</th>
                                         <th style={{width: '80px'}}>Unit</th>
                                         <th style={{width: '105px'}}>Date</th>
-                                        <th style={{width: 'auto', minWidth: '250px'}}>Issue</th>
+                                        <th style={{width: 'auto', minWidth: '200px'}}>Issue</th>
+                                        <th style={{width: 'auto', minWidth: '200px'}}>Repair Details</th>
                                         <th style={{width: '120px'}}>Reported By</th>
                                         <th style={{width: '110px'}}>Status</th>
                                         <th style={{width: '120px'}}>Actions</th>
@@ -2093,7 +2094,8 @@ class DataManager {
                                             <td><strong>{record.logNo}</strong></td>
                                             <td>{record.unitNo}</td>
                                             <td>{formatDate(record.dateReported)}</td>
-                                            <td style={{maxWidth: '400px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{record.issue || '-'}</td>
+                                            <td style={{maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{record.issue || '-'}</td>
+                                            <td style={{maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{record.repairDetails || '-'}</td>
                                             <td>{record.reportedBy || '-'}</td>
                                             <td><span className={`status-badge status-${(record.status || '').toLowerCase().replace(' ', '-')}`}>{record.status}</span></td>
                                             <td>
@@ -3640,26 +3642,29 @@ class DataManager {
 
 
             const calcForDate = (isoDate) => {
-                // Step 1: Present from Attendance
-                const presentAll = getPresentFromAttendance(isoDate);
+                // Step 1: All Active Operators (Bankstown) - 브라우저에 직접 기록된 자료
+                const allOperators = operatorSet;
 
-                // Step 2: Present operators = Present ∩ Operators
-                const presentOperators = intersectSets(presentAll, operatorSet);
-
-                // Step 3: Submitted from Checklists (by date+shift), then compare
+                // Step 2: Submitted from Checklists (by date+shift)
                 const submitted = getSubmittedFromChecklists(isoDate, selectedShift);
 
+                // Step 3: Missing = All Operators - Submitted
                 const missing = [];
-                for (const n of presentOperators) if (!submitted.has(n)) missing.push(n);
+                for (const n of allOperators) if (!submitted.has(n)) missing.push(n);
                 missing.sort();
+
+                // Step 4: (Optional) Present from Attendance for comparison only
+                const presentFromAttendance = getPresentFromAttendance(isoDate);
+                const attendanceComparison = intersectSets(presentFromAttendance, operatorSet);
 
                 return {
                     date: isoDate,
-                    presentOperatorsCount: presentOperators.size,
+                    allOperatorsCount: allOperators.size,
                     submittedCount: submitted.size,
                     missingCount: missing.length,
                     missing,
-                    submittedList: Array.from(submitted).sort()
+                    submittedList: Array.from(submitted).sort(),
+                    attendanceCount: attendanceComparison.size  // 비교용
                 };
             };
 
@@ -3669,7 +3674,7 @@ class DataManager {
             const rangeStats = dateList.map(d => calcForDate(d));
             const active = isRange ? (rangeStats.find(r => r.date === activeDate) || rangeStats[0] || calcForDate(selectedDate)) : calcForDate(selectedDate);
 
-            const presentCount = active.presentOperatorsCount;
+            const totalOperators = active.allOperatorsCount;
             const submittedCount = active.submittedCount;
             const missingCount = active.missingCount;
 return (
@@ -3706,7 +3711,7 @@ return (
                             {/* Row 2: Compact stat pills - clickable to toggle inline list */}
                             <div style={{display:'flex', gap:'10px', marginBottom:'0'}}>
                                 {[
-                                    {key:'ALL', label:'Present', count: presentCount, icon:'👥', bg:'#f0f7ff', border:'#d6e8f7', labelColor:'#5a7fa0'},
+                                    {key:'ALL', label:'Total Operators', count: totalOperators, icon:'👥', bg:'#f0f7ff', border:'#d6e8f7', labelColor:'#5a7fa0'},
                                     {key:'SUBMITTED', label:'Submitted', count: submittedCount, icon:'✅', bg:'#f0faf0', border:'#c8e6c9', labelColor:'#388e3c'},
                                     {key:'MISSING', label:'Missing', count: missingCount, icon: missingCount > 0 ? '🚨' : '✅', bg: missingCount > 0 ? '#fff5f5' : '#f0faf0', border: missingCount > 0 ? '#ffcdd2' : '#c8e6c9', labelColor: missingCount > 0 ? '#c62828' : '#388e3c'}
                                 ].map(pill => (
@@ -3738,7 +3743,7 @@ return (
                                         <thead>
                                             <tr>
                                                 <th>Date</th>
-                                                <th>Present</th>
+                                                <th>Total Operators</th>
                                                 <th>Submitted</th>
                                                 <th>Missing</th>
                                             </tr>
@@ -3747,7 +3752,7 @@ return (
                                             {rangeStats.map(r => (
                                                 <tr key={r.date} style={{cursor:'pointer'}} onClick={() => setActiveDate(r.date)}>
                                                     <td><strong>{r.date}</strong>{r.date === activeDate ? ' ✅' : ''}</td>
-                                                    <td>{r.presentOperatorsCount}</td>
+                                                    <td>{r.allOperatorsCount}</td>
                                                     <td>{r.submittedCount}</td>
                                                     <td style={{color: r.missingCount > 0 ? '#c62828' : 'inherit', fontWeight: r.missingCount > 0 ? 700 : 400}}>{r.missingCount}</td>
                                                 </tr>
@@ -3799,9 +3804,9 @@ return (
                                 listTitle = `Submitted Operators (${names.length})`;
                                 listColor = '#27ae60';
                             } else {
-                                const allPresent = Array.from(getPresentFromAttendance(active.date));
-                                names = Array.from(intersectSets(new Set(allPresent), operatorSet)).sort();
-                                listTitle = `All Present Operators (${names.length})`;
+                                // ALL: Show all operators from Operator master
+                                names = Array.from(operatorSet).sort();
+                                listTitle = `All Operators (${names.length})`;
                                 listColor = '#2c3e50';
                             }
 
@@ -3812,8 +3817,8 @@ return (
                                 return {
                                     name: displayName(n),
                                     unit: cl.unitNo || '-',
-                                    department: cl.department || op.group || '-',
-                                    shift: cl.shift || '-',
+                                    department: cl.department || op.department || '-',
+                                    shift: cl.shift || op.shift || '-',
                                     status: sub ? 'Submitted' : 'Missing',
                                     normalized: n
                                 };
