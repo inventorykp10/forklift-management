@@ -3515,16 +3515,23 @@ class DataManager {
             };
 
             const handleFileChange = async (e) => {
-                const file = e.target.files && e.target.files[0];
-                if (!file) return;
+                const files = e.target.files;
+                if (!files || files.length === 0) return;
 
                 try {
-                    const arrayBuffer = await file.arrayBuffer();
-                    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-                    const imported = parseAttendanceWorkbook(workbook);
+                    let allImported = [];
+                    
+                    // Process each file
+                    for (let i = 0; i < files.length; i++) {
+                        const file = files[i];
+                        const arrayBuffer = await file.arrayBuffer();
+                        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                        const imported = parseAttendanceWorkbook(workbook);
+                        allImported = [...allImported, ...imported];
+                    }
 
-                    // Merge by date; keep latest import (simple append then de-dupe by id)
-                    const merged = [...attendanceRecords, ...imported];
+                    // Merge with existing records and de-dupe
+                    const merged = [...attendanceRecords, ...allImported];
                     const seen = new Set();
                     const deduped = [];
                     for (const r of merged) {
@@ -3536,8 +3543,8 @@ class DataManager {
 
                     localStorage.setItem('forklift_attendance_records', JSON.stringify(deduped));
                     setAttendanceRecords(deduped);
-                    dataManager.addAuditLog('Import Attendance', `Imported ${imported.length} attendance row(s)`);
-                    alert(`Imported ${imported.length} attendance row(s).`);
+                    dataManager.addAuditLog('Import Attendance', `Imported ${allImported.length} attendance row(s) from ${files.length} file(s)`);
+                    alert(`✅ Imported ${allImported.length} attendance row(s) from ${files.length} file(s).`);
                 } catch (err) {
                     console.error(err);
                     alert('Import failed. Please check the file format.');
@@ -3690,7 +3697,7 @@ return (
                         </div>
                         <div className="content-header-right">
                             <button className="btn btn-secondary" onClick={handleImportClick}>📥 Import Attendance</button>
-                            <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{display:'none'}} onChange={handleFileChange} />
+                            <input ref={fileRef} type="file" accept=".xlsx,.xls" multiple style={{display:'none'}} onChange={handleFileChange} />
                         </div>
                     </div>
 
@@ -3940,13 +3947,98 @@ return (
                             });
 
                             const exportToExcel = () => {
-                                const header = ['#', 'Operator', 'Unit', 'Department', 'Shift', 'Status'];
-                                const data = rows.map((r, i) => [i+1, r.name, r.unit, r.department, r.shift, r.status]);
+                                // Ask user for date range
+                                const exportStart = prompt('Export Start Date (YYYY-MM-DD):', active.date);
+                                if (!exportStart) return; // User cancelled
+                                
+                                const exportEnd = prompt('Export End Date (YYYY-MM-DD):', active.date);
+                                if (!exportEnd) return; // User cancelled
+                                
+                                // Validate dates
+                                if (!/^\d{4}-\d{2}-\d{2}$/.test(exportStart) || !/^\d{4}-\d{2}-\d{2}$/.test(exportEnd)) {
+                                    alert('Invalid date format. Please use YYYY-MM-DD format.');
+                                    return;
+                                }
+                                
+                                // Get dates in range
+                                const exportDates = enumerateDates(exportStart, exportEnd);
+                                if (exportDates.length === 0) {
+                                    alert('No valid dates in range.');
+                                    return;
+                                }
+                                
+                                // Collect data for all dates
+                                const allData = [];
+                                for (const date of exportDates) {
+                                    const dateCalc = calcForDate(date);
+                                    
+                                    // Get operator details for this date
+                                    const operatorMap = new Map();
+                                    dataManager.getBankstownOperators().forEach(o => {
+                                        operatorMap.set(normalizeName(o.name || ''), o);
+                                    });
+                                    
+                                    const checklistMap = new Map();
+                                    (dataManager.data.checklists || []).forEach(c => {
+                                        const d = (c.date || '').toString().trim();
+                                        let iso = '';
+                                        if (/^\d{4}-\d{2}-\d{2}$/.test(d)) iso = d;
+                                        else {
+                                            const m2 = d.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+                                            if (m2) iso = `${m2[3]}-${m2[2]}-${m2[1]}`;
+                                        }
+                                        if (iso === date) {
+                                            const cshift = String(c.shift || '').toUpperCase();
+                                            const wanted = selectedShift.toUpperCase();
+                                            if (wanted === 'ALL' || cshift === wanted) {
+                                                const key = normalizeName(c.operator || '');
+                                                if (key) checklistMap.set(key, c);
+                                            }
+                                        }
+                                    });
+                                    
+                                    // Determine which names to export based on current listView
+                                    let namesToExport = [];
+                                    if (listView === 'MISSING') {
+                                        namesToExport = dateCalc.missing || [];
+                                    } else if (listView === 'SUBMITTED') {
+                                        namesToExport = dateCalc.submittedList || [];
+                                    } else {
+                                        // ALL: Show present operators
+                                        const presentFromAttendance = getPresentFromAttendance(date);
+                                        const presentOps = intersectSets(presentFromAttendance, operatorSet);
+                                        namesToExport = Array.from(presentOps).sort();
+                                    }
+                                    
+                                    // Build rows for this date
+                                    for (const n of namesToExport) {
+                                        const op = operatorMap.get(n) || {};
+                                        const cl = checklistMap.get(n) || {};
+                                        const sub = (dateCalc.submittedList || []).includes(n);
+                                        allData.push({
+                                            date: date,
+                                            name: displayName(n),
+                                            unit: cl.unitNo || '-',
+                                            department: cl.department || op.department || '-',
+                                            shift: cl.shift || op.shift || '-',
+                                            status: sub ? 'Submitted' : 'Missing'
+                                        });
+                                    }
+                                }
+                                
+                                if (allData.length === 0) {
+                                    alert('No data to export for selected date range.');
+                                    return;
+                                }
+                                
+                                // Create Excel
+                                const header = ['Date', 'Operator', 'Unit', 'Department', 'Shift', 'Status'];
+                                const data = allData.map((r, i) => [r.date, r.name, r.unit, r.department, r.shift, r.status]);
                                 const ws = XLSX.utils.aoa_to_sheet([header, ...data]);
-                                ws['!cols'] = [{wch:5},{wch:25},{wch:12},{wch:20},{wch:8},{wch:12}];
+                                ws['!cols'] = [{wch:12},{wch:25},{wch:12},{wch:20},{wch:8},{wch:12}];
                                 const wb = XLSX.utils.book_new();
                                 XLSX.utils.book_append_sheet(wb, ws, listView);
-                                XLSX.writeFile(wb, `Compliance_${listView}_${active.date}_${selectedShift}.xlsx`);
+                                XLSX.writeFile(wb, `Compliance_${listView}_${exportStart}_to_${exportEnd}_${selectedShift}.xlsx`);
                             };
 
                             return (
