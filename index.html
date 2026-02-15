@@ -3947,23 +3947,44 @@ return (
                             });
 
                             const exportToExcel = () => {
-                                // Ask user for date range
-                                const exportStart = prompt('Export Start Date (YYYY-MM-DD):', active.date);
-                                if (!exportStart) return; // User cancelled
+                                // Ask user for export type
+                                const exportType = prompt('Export Type:\n1. Single Date\n2. Date Range\n\nEnter 1 or 2:', '1');
+                                if (!exportType) return; // User cancelled
                                 
-                                const exportEnd = prompt('Export End Date (YYYY-MM-DD):', active.date);
-                                if (!exportEnd) return; // User cancelled
+                                let exportDates = [];
                                 
-                                // Validate dates
-                                if (!/^\d{4}-\d{2}-\d{2}$/.test(exportStart) || !/^\d{4}-\d{2}-\d{2}$/.test(exportEnd)) {
-                                    alert('Invalid date format. Please use YYYY-MM-DD format.');
+                                if (exportType === '1') {
+                                    // Single date
+                                    const singleDate = prompt('Enter Date (YYYY-MM-DD):', active.date);
+                                    if (!singleDate) return;
+                                    
+                                    if (!/^\d{4}-\d{2}-\d{2}$/.test(singleDate)) {
+                                        alert('Invalid date format. Please use YYYY-MM-DD format.');
+                                        return;
+                                    }
+                                    
+                                    exportDates = [singleDate];
+                                } else if (exportType === '2') {
+                                    // Date range
+                                    const exportStart = prompt('Export Start Date (YYYY-MM-DD):', active.date);
+                                    if (!exportStart) return;
+                                    
+                                    const exportEnd = prompt('Export End Date (YYYY-MM-DD):', active.date);
+                                    if (!exportEnd) return;
+                                    
+                                    if (!/^\d{4}-\d{2}-\d{2}$/.test(exportStart) || !/^\d{4}-\d{2}-\d{2}$/.test(exportEnd)) {
+                                        alert('Invalid date format. Please use YYYY-MM-DD format.');
+                                        return;
+                                    }
+                                    
+                                    exportDates = enumerateDates(exportStart, exportEnd);
+                                } else {
+                                    alert('Invalid selection. Please enter 1 or 2.');
                                     return;
                                 }
                                 
-                                // Get dates in range
-                                const exportDates = enumerateDates(exportStart, exportEnd);
                                 if (exportDates.length === 0) {
-                                    alert('No valid dates in range.');
+                                    alert('No valid dates selected.');
                                     return;
                                 }
                                 
@@ -4027,7 +4048,7 @@ return (
                                 }
                                 
                                 if (allData.length === 0) {
-                                    alert('No data to export for selected date range.');
+                                    alert('No data to export for selected date(s).');
                                     return;
                                 }
                                 
@@ -4038,7 +4059,13 @@ return (
                                 ws['!cols'] = [{wch:12},{wch:25},{wch:12},{wch:20},{wch:8},{wch:12}];
                                 const wb = XLSX.utils.book_new();
                                 XLSX.utils.book_append_sheet(wb, ws, listView);
-                                XLSX.writeFile(wb, `Compliance_${listView}_${exportStart}_to_${exportEnd}_${selectedShift}.xlsx`);
+                                
+                                // Filename based on export type
+                                const filename = exportDates.length === 1 
+                                    ? `Compliance_${listView}_${exportDates[0]}_${selectedShift}.xlsx`
+                                    : `Compliance_${listView}_${exportDates[0]}_to_${exportDates[exportDates.length-1]}_${selectedShift}.xlsx`;
+                                
+                                XLSX.writeFile(wb, filename);
                             };
 
                             return (
