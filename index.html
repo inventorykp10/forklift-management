@@ -3469,9 +3469,11 @@ class DataManager {
             const [selectedAttendanceDate, setSelectedAttendanceDate] = useState('');
             
             // Attendance search filters
-            const [attSearchOperator, setAttSearchOperator] = useState('');
-            const [attSearchDepartment, setAttSearchDepartment] = useState('');
+            const [attSearchOperator, setAttSearchOperator] = useState('ALL');
+            const [attSearchDepartment, setAttSearchDepartment] = useState('ALL');
             const [attSearchShift, setAttSearchShift] = useState('ALL');
+            const [attSearchAttendance, setAttSearchAttendance] = useState('ALL');
+            const [attSearchStatus, setAttSearchStatus] = useState('ALL');
             const [attSearchStartDate, setAttSearchStartDate] = useState('');
             const [attSearchEndDate, setAttSearchEndDate] = useState('');
 
@@ -4198,9 +4200,11 @@ return (
                                     <h2 style={{margin:0}}>Attendance Records</h2>
                                     <button onClick={() => {
                                         setShowAttendanceModal(false);
-                                        setAttSearchOperator('');
-                                        setAttSearchDepartment('');
+                                        setAttSearchOperator('ALL');
+                                        setAttSearchDepartment('ALL');
                                         setAttSearchShift('ALL');
+                                        setAttSearchAttendance('ALL');
+                                        setAttSearchStatus('ALL');
                                         setAttSearchStartDate('');
                                         setAttSearchEndDate('');
                                     }} style={{background:'none', border:'none', fontSize:'24px', cursor:'pointer', color:'#95a5a6'}}>✕</button>
@@ -4251,20 +4255,43 @@ return (
                                             // 4. 필터 적용
                                             let filtered = allRecords;
                                             
-                                            if (attSearchOperator.trim()) {
-                                                const searchLower = attSearchOperator.toLowerCase();
-                                                filtered = filtered.filter(r => (r.name || '').toLowerCase().includes(searchLower));
+                                            if (attSearchOperator !== 'ALL') {
+                                                filtered = filtered.filter(r => r.name === attSearchOperator);
                                             }
-                                            if (attSearchDepartment.trim()) {
-                                                const deptLower = attSearchDepartment.toLowerCase();
-                                                filtered = filtered.filter(r => {
-                                                    return r.operator && (r.operator.department || '').toLowerCase().includes(deptLower);
-                                                });
+                                            if (attSearchDepartment !== 'ALL') {
+                                                filtered = filtered.filter(r => r.operator?.department === attSearchDepartment);
                                             }
                                             if (attSearchShift !== 'ALL') {
                                                 filtered = filtered.filter(r => {
                                                     const shift = r.operator?.shift || '';
                                                     return shift.toUpperCase() === attSearchShift;
+                                                });
+                                            }
+                                            if (attSearchAttendance !== 'ALL') {
+                                                filtered = filtered.filter(r => r.attendance === attSearchAttendance);
+                                            }
+                                            if (attSearchStatus !== 'ALL') {
+                                                filtered = filtered.filter(r => {
+                                                    const recordDate = r.date;
+                                                    const operatorShift = (r.operator?.shift || '').toUpperCase();
+                                                    const hasChecklist = (dataManager.data.checklists || []).some(c => {
+                                                        const d = (c.date || '').toString().trim();
+                                                        let iso = '';
+                                                        if (/^\d{4}-\d{2}-\d{2}$/.test(d)) iso = d;
+                                                        else {
+                                                            const m = d.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+                                                            if (m) iso = `${m[3]}-${m[2]}-${m[1]}`;
+                                                        }
+                                                        const cshift = String(c.shift || '').toUpperCase();
+                                                        const coperator = normalizeName(c.operator || '');
+                                                        return iso === recordDate && cshift === operatorShift && coperator === normalizeName(r.operator?.name || '');
+                                                    });
+                                                    
+                                                    let status = 'N/A';
+                                                    if (r.attendance === 'Present') {
+                                                        status = hasChecklist ? 'Submitted' : 'Missing';
+                                                    }
+                                                    return status === attSearchStatus;
                                                 });
                                             }
                                             if (attSearchStartDate) {
@@ -4322,20 +4349,43 @@ return (
                                                 // 4. 필터 적용
                                                 let filtered = allRecords;
                                                 
-                                                if (attSearchOperator.trim()) {
-                                                    const searchLower = attSearchOperator.toLowerCase();
-                                                    filtered = filtered.filter(r => (r.name || '').toLowerCase().includes(searchLower));
+                                                if (attSearchOperator !== 'ALL') {
+                                                    filtered = filtered.filter(r => r.name === attSearchOperator);
                                                 }
-                                                if (attSearchDepartment.trim()) {
-                                                    const deptLower = attSearchDepartment.toLowerCase();
-                                                    filtered = filtered.filter(r => {
-                                                        return r.operator && (r.operator.department || '').toLowerCase().includes(deptLower);
-                                                    });
+                                                if (attSearchDepartment !== 'ALL') {
+                                                    filtered = filtered.filter(r => r.operator?.department === attSearchDepartment);
                                                 }
                                                 if (attSearchShift !== 'ALL') {
                                                     filtered = filtered.filter(r => {
                                                         const shift = r.operator?.shift || '';
                                                         return shift.toUpperCase() === attSearchShift;
+                                                    });
+                                                }
+                                                if (attSearchAttendance !== 'ALL') {
+                                                    filtered = filtered.filter(r => r.attendance === attSearchAttendance);
+                                                }
+                                                if (attSearchStatus !== 'ALL') {
+                                                    filtered = filtered.filter(r => {
+                                                        const recordDate = r.date;
+                                                        const operatorShift = (r.operator?.shift || '').toUpperCase();
+                                                        const hasChecklist = (dataManager.data.checklists || []).some(c => {
+                                                            const d = (c.date || '').toString().trim();
+                                                            let iso = '';
+                                                            if (/^\d{4}-\d{2}-\d{2}$/.test(d)) iso = d;
+                                                            else {
+                                                                const m = d.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+                                                                if (m) iso = `${m[3]}-${m[2]}-${m[1]}`;
+                                                            }
+                                                            const cshift = String(c.shift || '').toUpperCase();
+                                                            const coperator = normalizeName(c.operator || '');
+                                                            return iso === recordDate && cshift === operatorShift && coperator === normalizeName(r.operator?.name || '');
+                                                        });
+                                                        
+                                                        let status = 'N/A';
+                                                        if (r.attendance === 'Present') {
+                                                            status = hasChecklist ? 'Submitted' : 'Missing';
+                                                        }
+                                                        return status === attSearchStatus;
                                                     });
                                                 }
                                                 if (attSearchStartDate) {
@@ -4397,25 +4447,31 @@ return (
                                     
                                     {/* Search Filters */}
                                     <div style={{display:'flex', gap:'10px', marginBottom:'15px', flexWrap:'wrap', alignItems:'flex-end'}}>
-                                        <div style={{flex:'1', minWidth:'180px'}}>
-                                            <label style={{display:'block', fontSize:'12px', fontWeight:600, color:'#7f8c8d', marginBottom:'4px'}}>Operator Name</label>
-                                            <input 
-                                                type="text" 
-                                                placeholder="Search by name..." 
+                                        <div style={{minWidth:'180px'}}>
+                                            <label style={{display:'block', fontSize:'12px', fontWeight:600, color:'#7f8c8d', marginBottom:'4px'}}>Operator</label>
+                                            <select 
                                                 value={attSearchOperator}
                                                 onChange={(e) => setAttSearchOperator(e.target.value)}
-                                                style={{width:'100%', padding:'8px 12px', border:'1px solid #dfe6e9', borderRadius:'6px', fontSize:'13px'}}
-                                            />
+                                                style={{width:'100%', padding:'8px 12px', border:'1px solid #dfe6e9', borderRadius:'6px', fontSize:'13px', fontWeight:600}}
+                                            >
+                                                <option value="ALL">All Operators</option>
+                                                {[...new Set(dataManager.getBankstownOperators().map(o => o.name))].sort().map(name => (
+                                                    <option key={name} value={name}>{name}</option>
+                                                ))}
+                                            </select>
                                         </div>
-                                        <div style={{flex:'1', minWidth:'180px'}}>
+                                        <div style={{minWidth:'150px'}}>
                                             <label style={{display:'block', fontSize:'12px', fontWeight:600, color:'#7f8c8d', marginBottom:'4px'}}>Department</label>
-                                            <input 
-                                                type="text" 
-                                                placeholder="Search by department..." 
+                                            <select 
                                                 value={attSearchDepartment}
                                                 onChange={(e) => setAttSearchDepartment(e.target.value)}
-                                                style={{width:'100%', padding:'8px 12px', border:'1px solid #dfe6e9', borderRadius:'6px', fontSize:'13px'}}
-                                            />
+                                                style={{width:'100%', padding:'8px 12px', border:'1px solid #dfe6e9', borderRadius:'6px', fontSize:'13px', fontWeight:600}}
+                                            >
+                                                <option value="ALL">All Departments</option>
+                                                {[...new Set(dataManager.getBankstownOperators().map(o => o.department).filter(d => d))].sort().map(dept => (
+                                                    <option key={dept} value={dept}>{dept}</option>
+                                                ))}
+                                            </select>
                                         </div>
                                         <div style={{minWidth:'100px'}}>
                                             <label style={{display:'block', fontSize:'12px', fontWeight:600, color:'#7f8c8d', marginBottom:'4px'}}>Shift</label>
@@ -4427,6 +4483,31 @@ return (
                                                 <option value="ALL">All</option>
                                                 <option value="AM">AM</option>
                                                 <option value="PM">PM</option>
+                                            </select>
+                                        </div>
+                                        <div style={{minWidth:'120px'}}>
+                                            <label style={{display:'block', fontSize:'12px', fontWeight:600, color:'#7f8c8d', marginBottom:'4px'}}>Attendance</label>
+                                            <select 
+                                                value={attSearchAttendance}
+                                                onChange={(e) => setAttSearchAttendance(e.target.value)}
+                                                style={{width:'100%', padding:'8px 12px', border:'1px solid #dfe6e9', borderRadius:'6px', fontSize:'13px', fontWeight:600}}
+                                            >
+                                                <option value="ALL">All</option>
+                                                <option value="Present">Present</option>
+                                                <option value="Absent">Absent</option>
+                                            </select>
+                                        </div>
+                                        <div style={{minWidth:'130px'}}>
+                                            <label style={{display:'block', fontSize:'12px', fontWeight:600, color:'#7f8c8d', marginBottom:'4px'}}>Status</label>
+                                            <select 
+                                                value={attSearchStatus}
+                                                onChange={(e) => setAttSearchStatus(e.target.value)}
+                                                style={{width:'100%', padding:'8px 12px', border:'1px solid #dfe6e9', borderRadius:'6px', fontSize:'13px', fontWeight:600}}
+                                            >
+                                                <option value="ALL">All</option>
+                                                <option value="Submitted">Submitted</option>
+                                                <option value="Missing">Missing</option>
+                                                <option value="N/A">N/A</option>
                                             </select>
                                         </div>
                                         <div style={{minWidth:'140px'}}>
@@ -4450,9 +4531,11 @@ return (
                                         <button 
                                             className="btn btn-secondary" 
                                             onClick={() => {
-                                                setAttSearchOperator('');
-                                                setAttSearchDepartment('');
+                                                setAttSearchOperator('ALL');
+                                                setAttSearchDepartment('ALL');
                                                 setAttSearchShift('ALL');
+                                                setAttSearchAttendance('ALL');
+                                                setAttSearchStatus('ALL');
                                                 setAttSearchStartDate('');
                                                 setAttSearchEndDate('');
                                             }}
@@ -4524,20 +4607,43 @@ return (
                                                     // 4. 필터 적용
                                                     let filtered = allRecords;
                                                     
-                                                    if (attSearchOperator.trim()) {
-                                                        const searchLower = attSearchOperator.toLowerCase();
-                                                        filtered = filtered.filter(r => (r.name || '').toLowerCase().includes(searchLower));
+                                                    if (attSearchOperator !== 'ALL') {
+                                                        filtered = filtered.filter(r => r.name === attSearchOperator);
                                                     }
-                                                    if (attSearchDepartment.trim()) {
-                                                        const deptLower = attSearchDepartment.toLowerCase();
-                                                        filtered = filtered.filter(r => {
-                                                            return r.operator && (r.operator.department || '').toLowerCase().includes(deptLower);
-                                                        });
+                                                    if (attSearchDepartment !== 'ALL') {
+                                                        filtered = filtered.filter(r => r.operator?.department === attSearchDepartment);
                                                     }
                                                     if (attSearchShift !== 'ALL') {
                                                         filtered = filtered.filter(r => {
                                                             const shift = r.operator?.shift || '';
                                                             return shift.toUpperCase() === attSearchShift;
+                                                        });
+                                                    }
+                                                    if (attSearchAttendance !== 'ALL') {
+                                                        filtered = filtered.filter(r => r.attendance === attSearchAttendance);
+                                                    }
+                                                    if (attSearchStatus !== 'ALL') {
+                                                        filtered = filtered.filter(r => {
+                                                            const recordDate = r.date;
+                                                            const operatorShift = (r.operator?.shift || '').toUpperCase();
+                                                            const hasChecklist = (dataManager.data.checklists || []).some(c => {
+                                                                const d = (c.date || '').toString().trim();
+                                                                let iso = '';
+                                                                if (/^\d{4}-\d{2}-\d{2}$/.test(d)) iso = d;
+                                                                else {
+                                                                    const m = d.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+                                                                    if (m) iso = `${m[3]}-${m[2]}-${m[1]}`;
+                                                                }
+                                                                const cshift = String(c.shift || '').toUpperCase();
+                                                                const coperator = normalizeName(c.operator || '');
+                                                                return iso === recordDate && cshift === operatorShift && coperator === normalizeName(r.operator?.name || '');
+                                                            });
+                                                            
+                                                            let status = 'N/A';
+                                                            if (r.attendance === 'Present') {
+                                                                status = hasChecklist ? 'Submitted' : 'Missing';
+                                                            }
+                                                            return status === attSearchStatus;
                                                         });
                                                     }
                                                     if (attSearchStartDate) {
