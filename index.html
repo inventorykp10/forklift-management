@@ -2409,6 +2409,11 @@ class DataManager {
             const [startDate, setStartDate] = useState('');
             const [endDate, setEndDate] = useState('');
             const [savedDate, setSavedDate] = useState(null); // Save & Next 시 날짜 유지
+            
+            // Calendar view - default to today
+            const today = new Date();
+            const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            const [selectedDate, setSelectedDate] = useState(todayStr);
 
             const formatDateDMY = (dateStr) => {
                 if (!dateStr) return '';
@@ -2587,80 +2592,274 @@ class DataManager {
                 <div>
                     <div className="content-header">
                         <div className="content-header-left">
-                            <h1>Daily Pre-Checklist <span className="v3-badge">V6</span></h1>
-                            <p>Daily forklift inspection records - {filteredChecklists.length} checklists</p>
+                            <h1>Daily Pre-Checklist <span className="v3-badge">V7</span></h1>
+                            <p>Daily forklift inspection records - Calendar View</p>
                         </div>
                         <div className="content-header-right">
                             <img src={IMAGES.companyLogo} alt="Samsung SDS Cello" className="content-header-logo" />
                         </div>
                     </div>
 
-                    <div className="table-card">
-                        <div className="table-header">
-                            <h3>Recent Checklists ({filteredChecklists.length}) <span style={{fontSize: '14px', color: '#7f8c8d', fontWeight: 'normal'}}>💡 Double-click to view details</span></h3>
-                            <div style={{display: 'flex', gap: '10px'}}>
-                                <button className="btn btn-success" onClick={handleAdd}>➕ Add Checklist</button>
-                                <button className="btn btn-secondary" onClick={() => dataManager.exportToExcel('checklists')}>📊 Export</button>
+                    <div style={{display: 'grid', gridTemplateColumns: '350px 1fr', gap: '20px'}}>
+                        {/* Left: Calendar */}
+                        <div className="table-card" style={{height: 'fit-content'}}>
+                            <div className="table-header">
+                                <h3>📅 Select Date</h3>
+                            </div>
+                            <div style={{padding: '20px'}}>
+                                {(() => {
+                                    const today = new Date();
+                                    const currentYear = today.getFullYear();
+                                    const currentMonth = today.getMonth();
+                                    
+                                    const [viewYear, setViewYear] = useState(currentYear);
+                                    const [viewMonth, setViewMonth] = useState(currentMonth);
+                                    
+                                    const firstDay = new Date(viewYear, viewMonth, 1);
+                                    const lastDay = new Date(viewYear, viewMonth + 1, 0);
+                                    const daysInMonth = lastDay.getDate();
+                                    const startDayOfWeek = firstDay.getDay(); // 0 = Sunday
+                                    
+                                    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                                                       'July', 'August', 'September', 'October', 'November', 'December'];
+                                    
+                                    const handlePrevMonth = () => {
+                                        if (viewMonth === 0) {
+                                            setViewMonth(11);
+                                            setViewYear(viewYear - 1);
+                                        } else {
+                                            setViewMonth(viewMonth - 1);
+                                        }
+                                    };
+                                    
+                                    const handleNextMonth = () => {
+                                        if (viewMonth === 11) {
+                                            setViewMonth(0);
+                                            setViewYear(viewYear + 1);
+                                        } else {
+                                            setViewMonth(viewMonth + 1);
+                                        }
+                                    };
+                                    
+                                    return (
+                                        <>
+                                            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
+                                                <button onClick={handlePrevMonth} style={{background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer'}}>◀</button>
+                                                <div style={{fontSize: '16px', fontWeight: 700}}>{monthNames[viewMonth]} {viewYear}</div>
+                                                <button onClick={handleNextMonth} style={{background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer'}}>▶</button>
+                                            </div>
+                                            
+                                            <div style={{display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '5px', marginBottom: '10px'}}>
+                                                {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
+                                                    <div key={day} style={{textAlign: 'center', fontSize: '12px', fontWeight: 700, color: '#7f8c8d', padding: '5px'}}>{day}</div>
+                                                ))}
+                                            </div>
+                                            
+                                            <div style={{display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '5px'}}>
+                                                {Array.from({length: startDayOfWeek}, (_, i) => (
+                                                    <div key={`empty-${i}`} style={{padding: '10px'}}></div>
+                                                ))}
+                                                
+                                                {Array.from({length: daysInMonth}, (_, i) => {
+                                                    const day = i + 1;
+                                                    const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                                                    const isSelected = selectedDate === dateStr;
+                                                    const isToday = dateStr === `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                                                    
+                                                    return (
+                                                        <div
+                                                            key={day}
+                                                            onClick={() => setSelectedDate(dateStr)}
+                                                            style={{
+                                                                padding: '10px',
+                                                                textAlign: 'center',
+                                                                cursor: 'pointer',
+                                                                borderRadius: '8px',
+                                                                background: isSelected ? '#3498db' : isToday ? '#e8f5e9' : '#fff',
+                                                                color: isSelected ? '#fff' : '#2c3e50',
+                                                                fontWeight: isSelected || isToday ? 700 : 400,
+                                                                border: isToday ? '2px solid #27ae60' : '1px solid #e9ecef',
+                                                                transition: 'all 0.2s'
+                                                            }}
+                                                            onMouseEnter={(e) => {
+                                                                if (!isSelected) {
+                                                                    e.currentTarget.style.background = '#f8f9fa';
+                                                                }
+                                                            }}
+                                                            onMouseLeave={(e) => {
+                                                                if (!isSelected) {
+                                                                    e.currentTarget.style.background = isToday ? '#e8f5e9' : '#fff';
+                                                                }
+                                                            }}
+                                                        >
+                                                            {day}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </>
+                                    );
+                                })()}
                             </div>
                         </div>
 
-                        <div className="search-filters">
-                            <div className="search-box">
-                                <span className="search-icon">🔍</span>
-                                <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                                {searchTerm && (
-                                    <button onClick={() => setSearchTerm('')} style={{position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: '#95a5a6'}}>✕</button>
-                                )}
-                            </div>
-                            <div style={{display: 'flex', gap: '10px', alignItems: 'center'}}>
-                                <label style={{fontSize: '14px', fontWeight: 600, color: '#2c3e50'}}>Date Range:</label>
-                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{padding: '8px 12px', border: '1px solid #ddd', borderRadius: '8px'}} />
-                                <span style={{color: '#7f8c8d'}}>to</span>
-                                <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={{padding: '8px 12px', border: '1px solid #ddd', borderRadius: '8px'}} />
-                                {(startDate || endDate) && (
-                                    <button onClick={() => {setStartDate(''); setEndDate('');}} className="btn btn-secondary" style={{padding: '8px 12px'}}>Clear</button>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="table-wrapper">
-                            <table className="data-table">
-                                <thead>
-                                    <tr>
-                                        <th style={{width: '100px'}}>Date</th>
-                                        <th style={{width: '90px'}}>Unit</th>
-                                        <th style={{width: '150px'}}>Operator</th>
-                                        <th style={{width: '110px'}}>Department</th>
-                                        <th style={{width: '80px'}}>Shift</th>
-                                        <th style={{width: '100px'}}>Result</th>
-                                        <th style={{width: '160px'}}>Issue Description</th>
-                                        <th style={{width: '120px'}}>Required Action</th>
-                                        <th style={{width: '120px'}}>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredChecklists.map(c => (
-                                        <tr key={c.id} onDoubleClick={() => handleDoubleClick(c)} style={{cursor: 'pointer'}} title="Double-click to view full details">
-                                            <td>{formatDateDMY(c.date)}</td>
-                                            <td>{c.unitNo}</td>
-                                            <td>{c.operator}</td>
-                                            <td>{c.department || '-'}</td>
-                                            <td>{c.shift}</td>
-                                            <td><span className={`status-badge status-${(c.result || '').toLowerCase()}`}>{c.result}</span></td>
-                                            <td style={{maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '13px'}}>{c.issueDetails || '-'}</td>
-                                            <td style={{fontSize: '13px'}}>{c.repairAction || '-'}</td>
-                                            <td>
-                                                <div className="action-icons">
-                                                    <button className="icon-btn edit" onClick={(e) => { e.stopPropagation(); handleEdit(c); }} title="Edit">✏️</button>
-                                                    <button className="icon-btn delete" onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }} title="Delete">🗑️</button>
+                        {/* Right: Date Summary & Checklist List */}
+                        <div>
+                            {/* Summary Stats for Selected Date */}
+                            {selectedDate && (() => {
+                                const attendanceRecords = JSON.parse(localStorage.getItem('forklift_attendance_records') || '[]');
+                                
+                                // Get present operators from attendance
+                                const presentFromAttendance = attendanceRecords
+                                    .filter(r => r.date === selectedDate && String(r.direction || '').toLowerCase() !== 'absent' && (r.dateTime || '').trim() !== '')
+                                    .map(r => {
+                                        const name = (r.name || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+                                        return name;
+                                    })
+                                    .filter(Boolean);
+                                
+                                const presentOperators = new Set();
+                                dataManager.getBankstownOperators().forEach(o => {
+                                    const opName = (o.name || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+                                    if (opName && presentFromAttendance.includes(opName)) {
+                                        presentOperators.add(opName);
+                                    }
+                                });
+                                
+                                // Get submitted from checklists
+                                const submitted = filteredChecklists.filter(c => {
+                                    const d = (c.date || '').toString().trim();
+                                    let iso = '';
+                                    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) iso = d;
+                                    else {
+                                        const m = d.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+                                        if (m) iso = `${m[3]}-${m[2]}-${m[1]}`;
+                                    }
+                                    return iso === selectedDate;
+                                }).map(c => {
+                                    const name = (c.operator || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+                                    return name;
+                                }).filter(Boolean);
+                                
+                                const submittedSet = new Set(submitted);
+                                const submittedAndPresent = Array.from(presentOperators).filter(n => submittedSet.has(n));
+                                const missing = Array.from(presentOperators).filter(n => !submittedSet.has(n));
+                                
+                                return (
+                                    <div className="table-card" style={{marginBottom: '20px'}}>
+                                        <div style={{padding: '20px'}}>
+                                            <h3 style={{marginBottom: '15px'}}>📊 Summary for {selectedDate}</h3>
+                                            <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px'}}>
+                                                <div style={{padding: '15px', background: '#e8f5e9', borderRadius: '10px', border: '2px solid #27ae60'}}>
+                                                    <div style={{fontSize: '12px', color: '#7f8c8d', fontWeight: 700, marginBottom: '5px'}}>PRESENT</div>
+                                                    <div style={{fontSize: '32px', fontWeight: 800, color: '#27ae60'}}>{presentOperators.size}</div>
                                                 </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                        </table>
+                                                <div style={{padding: '15px', background: '#e3f2fd', borderRadius: '10px', border: '2px solid #2196f3'}}>
+                                                    <div style={{fontSize: '12px', color: '#7f8c8d', fontWeight: 700, marginBottom: '5px'}}>SUBMITTED</div>
+                                                    <div style={{fontSize: '32px', fontWeight: 800, color: '#2196f3'}}>{submittedAndPresent.length}</div>
+                                                </div>
+                                                <div style={{padding: '15px', background: '#ffebee', borderRadius: '10px', border: '2px solid #c62828'}}>
+                                                    <div style={{fontSize: '12px', color: '#7f8c8d', fontWeight: 700, marginBottom: '5px'}}>MISSING</div>
+                                                    <div style={{fontSize: '32px', fontWeight: 800, color: '#c62828'}}>{missing.length}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* Checklist Table */}
+                            <div className="table-card">
+                                <div className="table-header">
+                                    <h3>Checklists for {selectedDate || 'Selected Date'} ({filteredChecklists.filter(c => {
+                                        const d = (c.date || '').toString().trim();
+                                        let iso = '';
+                                        if (/^\d{4}-\d{2}-\d{2}$/.test(d)) iso = d;
+                                        else {
+                                            const m = d.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+                                            if (m) iso = `${m[3]}-${m[2]}-${m[1]}`;
+                                        }
+                                        return iso === selectedDate;
+                                    }).length})</h3>
+                                    <div style={{display: 'flex', gap: '10px'}}>
+                                        <button className="btn btn-success" onClick={handleAdd}>➕ Add Checklist</button>
+                                        <button className="btn btn-secondary" onClick={() => dataManager.exportToExcel('checklists')}>📊 Export</button>
+                                    </div>
+                                </div>
+
+                                <div className="search-filters">
+                                    <div className="search-box">
+                                        <span className="search-icon">🔍</span>
+                                        <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                                        {searchTerm && (
+                                            <button onClick={() => setSearchTerm('')} style={{position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: '#95a5a6'}}>✕</button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="table-wrapper">
+                                    <table className="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th style={{width: '90px'}}>Unit</th>
+                                                <th style={{width: '150px'}}>Operator</th>
+                                                <th style={{width: '110px'}}>Department</th>
+                                                <th style={{width: '80px'}}>Shift</th>
+                                                <th style={{width: '100px'}}>Result</th>
+                                                <th style={{width: '160px'}}>Issue Description</th>
+                                                <th style={{width: '120px'}}>Required Action</th>
+                                                <th style={{width: '120px'}}>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {filteredChecklists.filter(c => {
+                                                const d = (c.date || '').toString().trim();
+                                                let iso = '';
+                                                if (/^\d{4}-\d{2}-\d{2}$/.test(d)) iso = d;
+                                                else {
+                                                    const m = d.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+                                                    if (m) iso = `${m[3]}-${m[2]}-${m[1]}`;
+                                                }
+                                                return iso === selectedDate;
+                                            }).map(c => (
+                                                <tr key={c.id} onDoubleClick={() => handleDoubleClick(c)} style={{cursor: 'pointer'}} title="Double-click to view full details">
+                                                    <td>{c.unitNo}</td>
+                                                    <td>{c.operator}</td>
+                                                    <td>{c.department || '-'}</td>
+                                                    <td>{c.shift}</td>
+                                                    <td><span className={`status-badge status-${(c.result || '').toLowerCase()}`}>{c.result}</span></td>
+                                                    <td style={{maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '13px'}}>{c.issueDetails || '-'}</td>
+                                                    <td style={{fontSize: '13px'}}>{c.repairAction || '-'}</td>
+                                                    <td>
+                                                        <div className="action-icons">
+                                                            <button className="icon-btn edit" onClick={(e) => { e.stopPropagation(); handleEdit(c); }} title="Edit">✏️</button>
+                                                            <button className="icon-btn delete" onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }} title="Delete">🗑️</button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {filteredChecklists.filter(c => {
+                                                const d = (c.date || '').toString().trim();
+                                                let iso = '';
+                                                if (/^\d{4}-\d{2}-\d{2}$/.test(d)) iso = d;
+                                                else {
+                                                    const m = d.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+                                                    if (m) iso = `${m[3]}-${m[2]}-${m[1]}`;
+                                                }
+                                                return iso === selectedDate;
+                                            }).length === 0 && (
+                                                <tr>
+                                                    <td colSpan="8" style={{textAlign: 'center', padding: '40px', color: '#95a5a6'}}>
+                                                        No checklists for this date
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        </div>
                     </div>
-                </div>
 
                     {showModal && (
                         <ChecklistModal 
