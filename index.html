@@ -4180,6 +4180,9 @@ return (
                                     <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'15px'}}>
                                         <h3 style={{margin:0}}>Records ({(() => {
                                             let filtered = attendanceRecords.filter(r => {
+                                                // 날짜가 없는 레코드 제외
+                                                if (!r.date || r.date.trim() === '') return false;
+                                                
                                                 const normalized = normalizeName(r.name);
                                                 const operator = dataManager.getBankstownOperators().find(o => normalizeName(o.name) === normalized);
                                                 return operator !== undefined;
@@ -4218,6 +4221,9 @@ return (
                                             className="btn btn-success" 
                                             onClick={() => {
                                                 let filtered = attendanceRecords.filter(r => {
+                                                    // 날짜가 없는 레코드 제외
+                                                    if (!r.date || r.date.trim() === '') return false;
+                                                    
                                                     const normalized = normalizeName(r.name);
                                                     const operator = dataManager.getBankstownOperators().find(o => normalizeName(o.name) === normalized);
                                                     return operator !== undefined;
@@ -4279,7 +4285,7 @@ return (
                                                         Name: r.name || '-',
                                                         Department: operator?.department || '-',
                                                         Shift: operator?.shift || '-',
-                                                        Attendance: (String(r.direction || '').toLowerCase() === 'absent' || String(r.direction || '').toLowerCase() === 'out') ? '결근' : '출근',
+                                                        Attendance: (String(r.direction || '').toLowerCase() === 'absent' || String(r.direction || '').toLowerCase() === 'out') ? 'Absent' : 'Present',
                                                         Status: hasChecklist ? 'Submitted' : (!hasChecklist && r.direction !== 'Absent' && r.direction !== 'Out') ? 'Missing' : '-'
                                                     };
                                                 });
@@ -4379,6 +4385,9 @@ return (
                                             <tbody>
                                                 {(() => {
                                                     let filtered = attendanceRecords.filter(r => {
+                                                        // 날짜가 없는 레코드 제외
+                                                        if (!r.date || r.date.trim() === '') return false;
+                                                        
                                                         const normalized = normalizeName(r.name);
                                                         const operator = dataManager.getBankstownOperators().find(o => normalizeName(o.name) === normalized);
                                                         return operator !== undefined;
@@ -4452,13 +4461,13 @@ return (
                                                         
                                                         const directionLower = String(record.direction || '').toLowerCase();
                                                         
-                                                        // Attendance 상태 결정: In/Present = 출근, Absent = 결근, 기타 = 출근으로 간주
-                                                        let attendanceLabel = '출근';
+                                                        // Attendance 상태 결정: In/Present = Present, Absent = Absent
+                                                        let attendanceLabel = 'Present';
                                                         let attendanceColor = '#27ae60';
                                                         let attendanceBg = '#e8f5e9';
                                                         
                                                         if (directionLower === 'absent' || directionLower === 'out') {
-                                                            attendanceLabel = '결근';
+                                                            attendanceLabel = 'Absent';
                                                             attendanceColor = '#95a5a6';
                                                             attendanceBg = '#f5f5f5';
                                                         }
@@ -4467,7 +4476,7 @@ return (
                                                             statusLabel = '✅ Submitted';
                                                             statusColor = '#27ae60';
                                                             statusBg = '#e8f5e9';
-                                                        } else if (directionLower === 'in' || directionLower === 'present' || directionLower === 'arrive' || directionLower.includes('in') || attendanceLabel === '출근') {
+                                                        } else if (directionLower === 'in' || directionLower === 'present' || directionLower === 'arrive' || directionLower.includes('in') || attendanceLabel === 'Present') {
                                                             statusLabel = '🚨 Missing';
                                                             statusColor = '#c62828';
                                                             statusBg = '#ffebee';
