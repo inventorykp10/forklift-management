@@ -3881,7 +3881,14 @@ return (
                                                 </thead>
                                                 <tbody>
                                                     {rows.map((r, i) => (
-                                                        <tr key={r.normalized}>
+                                                        <tr key={r.normalized}
+                                                            onDoubleClick={() => {
+                                                                setAttSearchStartDate(dateStat.date);
+                                                                setAttSearchEndDate(dateStat.date);
+                                                                setShowAttendanceModal(true);
+                                                            }}
+                                                            style={{cursor: 'pointer'}}
+                                                            title="Double-click to view attendance details">
                                                             <td style={{color:'#adb5bd'}}>{i+1}</td>
                                                             <td style={{fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{r.name}</td>
                                                             <td>{r.unit}</td>
@@ -4113,7 +4120,14 @@ return (
                                                 </thead>
                                                 <tbody>
                                                     {rows.map((r, i) => (
-                                                        <tr key={r.normalized}>
+                                                        <tr key={r.normalized}
+                                                            onDoubleClick={() => {
+                                                                setAttSearchStartDate(active.date);
+                                                                setAttSearchEndDate(active.date);
+                                                                setShowAttendanceModal(true);
+                                                            }}
+                                                            style={{cursor: 'pointer'}}
+                                                            title="Double-click to view attendance details">
                                                             <td style={{color:'#adb5bd'}}>{i+1}</td>
                                                             <td style={{fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{r.name}</td>
                                                             <td>{r.unit}</td>
@@ -4424,11 +4438,13 @@ return (
                                                         let statusColor = '#95a5a6';
                                                         let statusBg = '#f5f5f5';
                                                         
+                                                        const directionLower = String(record.direction || '').toLowerCase();
+                                                        
                                                         if (hasChecklist) {
                                                             statusLabel = '✅ Submitted';
                                                             statusColor = '#27ae60';
                                                             statusBg = '#e8f5e9';
-                                                        } else if (record.direction === 'In') {
+                                                        } else if (directionLower === 'in' || directionLower === 'present' || directionLower === 'arrive' || directionLower.includes('in')) {
                                                             statusLabel = '🚨 Missing';
                                                             statusColor = '#c62828';
                                                             statusBg = '#ffebee';
