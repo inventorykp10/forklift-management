@@ -4645,6 +4645,50 @@ return (
                 e.target.value = '';
             };
 
+            // 기존 체크리스트에 로그 번호 생성
+            const handleGenerateLogNumbers = () => {
+                if (!confirm('Generate log numbers for all existing checklists?\n\nThis will add log numbers in format: YYYY-MM-DD-NNN')) {
+                    return;
+                }
+                
+                try {
+                    const checklists = dataManager.data.checklists;
+                    
+                    // 날짜별로 그룹화
+                    const dateGroups = {};
+                    checklists.forEach(checklist => {
+                        const date = checklist.date;
+                        if (!date) return;
+                        if (!dateGroups[date]) {
+                            dateGroups[date] = [];
+                        }
+                        dateGroups[date].push(checklist);
+                    });
+                    
+                    // 각 날짜별로 일련번호 부여
+                    let updatedCount = 0;
+                    Object.keys(dateGroups).sort().forEach(date => {
+                        const checklistsForDate = dateGroups[date];
+                        checklistsForDate.forEach((checklist, index) => {
+                            const sequenceNumber = (index + 1).toString().padStart(3, '0');
+                            const logNumber = `${date}-${sequenceNumber}`;
+                            checklist.logNumber = logNumber;
+                            updatedCount++;
+                        });
+                    });
+                    
+                    // 저장
+                    dataManager.saveData('checklists');
+                    dataManager.addAuditLog('Generate Log Numbers', `Generated log numbers for ${updatedCount} checklists`);
+                    
+                    alert(`✅ Successfully generated log numbers for ${updatedCount} checklists!\n\nPlease refresh the page to see the changes.`);
+                    setImportMsg(`✅ Generated log numbers for ${updatedCount} checklists. Please refresh.`);
+                    setTimeout(() => setImportMsg(''), 5000);
+                } catch (err) {
+                    alert(`❌ Error: ${err.message}`);
+                }
+            };
+
             const handleResetAll = () => {
                 if (!confirmReset) { setConfirmReset(true); return; }
                 const lsKeys = Object.keys(localStorage).filter(k => k.startsWith('forklift_'));
@@ -4778,6 +4822,16 @@ return (
                                 </button>
                                 <input ref={fileInputRef} type="file" accept=".json" onChange={handleImportAll} style={{display: 'none'}} />
                                 {importMsg && <div style={{marginTop: '10px', fontSize: '13px'}}>{importMsg}</div>}
+                            </div>
+                            {/* Generate Log Numbers */}
+                            <div style={{background: '#fff', borderRadius: '12px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '1px solid #d1ecf1'}}>
+                                <h3 style={{margin: '0 0 8px', fontSize: '17px', color: '#0c5460'}}>🔢 Generate Log Numbers</h3>
+                                <p style={{color: '#666', fontSize: '13px', margin: '0 0 14px'}}>Generate log numbers for all existing checklists that don't have them yet. Format: YYYY-MM-DD-NNN (e.g., 2024-02-13-001)</p>
+                                {!isAdmin && <div style={{padding: '12px', background: '#fff3cd', borderRadius: '6px', marginBottom: '12px', fontSize: '13px'}}>⚠️ Only Admin users can generate log numbers.</div>}
+                                <button onClick={() => isAdmin ? handleGenerateLogNumbers() : alert('Admin access required')}
+                                    style={{padding: '10px 20px', background: isAdmin ? '#17a2b8' : '#bdc3c7', color: '#fff', border: 'none', borderRadius: '6px', cursor: isAdmin ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '14px'}}>
+                                    🔢 Generate Log Numbers
+                                </button>
                             </div>
                             {/* Reset */}
                             <div style={{background: '#fff', borderRadius: '12px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '1px solid #f5c6cb'}}>
