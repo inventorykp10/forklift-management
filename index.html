@@ -3731,7 +3731,7 @@ return (
                             </div>
 
                             {/* Row 2: Compact stat pills - clickable to toggle inline list */}
-                            <div style={{display:'flex', gap:'10px', marginBottom:'0'}}>
+                            <div style={{display:'flex', gap:'10px', marginBottom:'12px'}}>
                                 {[
                                     {key:'SUMMARY', label:'Summary', count: `${submittedCount}/${totalOperators}`, icon:'📊', bg:'#f0f7ff', border:'#d6e8f7', labelColor:'#5a7fa0'},
                                     {key:'ATTENDANCE', label:'Attendance', count: attendanceRecords.filter(r => {
@@ -3770,42 +3770,42 @@ return (
                                     </div>
                                 ))}
                             </div>
-                        </div>
 
-                        {/* Range summary table - Always show when range is selected */}
-                        {dateList.length > 1 && (
-                            <div style={{margin:'0 20px 10px', border:'1px solid #e9ecef', borderRadius:'8px', overflow:'hidden'}}>
-                                <div style={{padding:'8px 12px', background:'#f8f9fa', fontSize:'13px', fontWeight:600, color:'#2c3e50'}}>Range Summary ({dateList.length} days)</div>
-                                <div className="table-wrapper">
-                                    <table className="data-table" style={{marginBottom:0}}>
-                                        <thead>
-                                            <tr>
-                                                <th>Date</th>
-                                                <th>Present</th>
-                                                <th>Submitted</th>
-                                                <th>Missing</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {rangeStats.map(r => (
-                                                <tr key={r.date}
-                                                    onDoubleClick={() => {
-                                                        setActiveDate(r.date);
-                                                        setListView('SUMMARY');
-                                                    }}
-                                                    style={{cursor: 'pointer'}}
-                                                    title="Double-click to view details">
-                                                    <td><strong>{r.date}</strong></td>
-                                                    <td>{r.allOperatorsCount}</td>
-                                                    <td>{r.submittedCount}</td>
-                                                    <td style={{color: r.missingCount > 0 ? '#c62828' : 'inherit', fontWeight: r.missingCount > 0 ? 700 : 400}}>{r.missingCount}</td>
+                            {/* Range summary table - Show when range is selected */}
+                            {dateList.length > 1 && (
+                                <div style={{border:'1px solid #e9ecef', borderRadius:'8px', overflow:'hidden', marginBottom:'12px'}}>
+                                    <div style={{padding:'8px 12px', background:'#f8f9fa', fontSize:'13px', fontWeight:600, color:'#2c3e50'}}>Range Summary ({dateList.length} days)</div>
+                                    <div className="table-wrapper">
+                                        <table className="data-table" style={{marginBottom:0}}>
+                                            <thead>
+                                                <tr>
+                                                    <th>Date</th>
+                                                    <th>Present</th>
+                                                    <th>Submitted</th>
+                                                    <th>Missing</th>
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                            </thead>
+                                            <tbody>
+                                                {rangeStats.map(r => (
+                                                    <tr key={r.date}
+                                                        onDoubleClick={() => {
+                                                            setActiveDate(r.date);
+                                                            setListView('SUMMARY');
+                                                        }}
+                                                        style={{cursor: 'pointer'}}
+                                                        title="Double-click to view details">
+                                                        <td><strong>{r.date}</strong></td>
+                                                        <td>{r.allOperatorsCount}</td>
+                                                        <td>{r.submittedCount}</td>
+                                                        <td style={{color: r.missingCount > 0 ? '#c62828' : 'inherit', fontWeight: r.missingCount > 0 ? 700 : 400}}>{r.missingCount}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
+                        </div>
 
                         {/* Show all dates data when range is selected */}
                         {listView && dateList.length > 1 && (() => {
