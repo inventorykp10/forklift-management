@@ -1320,8 +1320,9 @@ class DataManager {
             const [showModal, setShowModal] = useState(false);
             const [editingOperator, setEditingOperator] = useState(null);
             const [searchTerm, setSearchTerm] = useState('');
+            const [filterOperator, setFilterOperator] = useState('all');
             const [filterDepartment, setFilterDepartment] = useState('all');
-            const [filterStatus, setFilterStatus] = useState('all');
+            const [filterShift, setFilterShift] = useState('all');
             
             // Refresh operators list when component becomes visible
             useEffect(() => {
@@ -1489,11 +1490,13 @@ class DataManager {
                                     (o.shift || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                                     (o.licenseNo || '').toLowerCase().includes(searchTerm.toLowerCase());
                 
+                const matchesOperator = filterOperator === 'all' || (o.name || '').toLowerCase() === filterOperator.toLowerCase();
+                
                 const matchesDepartment = filterDepartment === 'all' || (o.department || '').toLowerCase() === filterDepartment.toLowerCase();
                 
-                const matchesStatus = filterStatus === 'all' || (o.status || '').toLowerCase() === filterStatus.toLowerCase();
+                const matchesShift = filterShift === 'all' || (o.shift || '').toLowerCase() === filterShift.toLowerCase();
                 
-                return matchesSearch && matchesDepartment && matchesStatus;
+                return matchesSearch && matchesOperator && matchesDepartment && matchesShift;
             });
 
             const handleAdd = () => {
@@ -1560,20 +1563,26 @@ class DataManager {
                                     <button onClick={() => setSearchTerm('')} style={{position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: '#95a5a6'}}>✕</button>
                                 )}
                             </div>
+                            <select className="filter-select" value={filterOperator} onChange={(e) => setFilterOperator(e.target.value)} style={{minWidth: '200px'}}>
+                                <option value="all">All Operators</option>
+                                {[...new Set(operators.map(o => o.name).filter(n => n && n.trim()))].sort().map(name => (
+                                    <option key={name} value={name}>{name}</option>
+                                ))}
+                            </select>
                             <select className="filter-select" value={filterDepartment} onChange={(e) => setFilterDepartment(e.target.value)}>
                                 <option value="all">All Departments</option>
                                 {[...new Set(operators.map(o => o.department).filter(d => d && d.trim()))].sort().map(dept => (
                                     <option key={dept} value={dept}>{dept}</option>
                                 ))}
                             </select>
-                            <select className="filter-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-                                <option value="all">All Status</option>
-                                <option value="Active">Active</option>
-                                <option value="Inactive">Inactive</option>
-                                <option value="Suspended">Suspended</option>
+                            <select className="filter-select" value={filterShift} onChange={(e) => setFilterShift(e.target.value)}>
+                                <option value="all">All Shifts</option>
+                                {[...new Set(operators.map(o => o.shift).filter(s => s && s.trim()))].sort().map(shift => (
+                                    <option key={shift} value={shift}>{shift}</option>
+                                ))}
                             </select>
-                            {(searchTerm || filterDepartment !== 'all' || filterStatus !== 'all') && (
-                                <button onClick={() => {setSearchTerm(''); setFilterDepartment('all'); setFilterStatus('all');}} className="btn btn-secondary" style={{padding: '8px 12px'}}>Clear Filters</button>
+                            {(searchTerm || filterOperator !== 'all' || filterDepartment !== 'all' || filterShift !== 'all') && (
+                                <button onClick={() => {setSearchTerm(''); setFilterOperator('all'); setFilterDepartment('all'); setFilterShift('all');}} className="btn btn-secondary" style={{padding: '8px 12px'}}>Clear</button>
                             )}
                         </div>
 
