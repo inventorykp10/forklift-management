@@ -1583,6 +1583,7 @@ class DataManager {
                             <table className="data-table">
                                 <thead>
                                     <tr>
+                                        <th style={{width: '50px'}}>No.</th>
                                         <th>Name</th>
                                         <th>License No</th>
                                         <th>Department</th>
@@ -1596,13 +1597,14 @@ class DataManager {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filteredOperators.map(op => {
+                                    {filteredOperators.map((op, index) => {
                                         const expiryDays = calculateDaysUntilExpiry(op.licenseExpiry);
                                         const expiryStyle = getExpiryStyle(expiryDays);
                                         const expiryDisplay = formatExpiryDisplay(op.licenseExpiry);
                                         
                                         return (
                                             <tr key={op.id} onDoubleClick={() => handleDoubleClick(op)} style={{cursor: 'pointer'}} title="Double-click to view details">
+                                                <td style={{textAlign: 'center', fontWeight: 600, color: '#7f8c8d'}}>{index + 1}</td>
                                                 <td><strong>{op.name}</strong></td>
                                                 <td>{op.licenseNo}</td>
                                                 <td>{op.department || '-'}</td>
@@ -4661,6 +4663,7 @@ return (
                                         <table className="data-table">
                                             <thead style={{position:'sticky', top:0, zIndex:1}}>
                                                 <tr>
+                                                    <th style={{width:'50px'}}>No.</th>
                                                     <th style={{width:'120px'}}>Date</th>
                                                     <th style={{width:'200px'}}>Name</th>
                                                     <th style={{width:'180px'}}>Department</th>
@@ -4776,7 +4779,7 @@ return (
                                                     if (filtered.length === 0) {
                                                         return (
                                                             <tr>
-                                                                <td colSpan="7" style={{textAlign:'center', padding:'40px', color:'#95a5a6', fontStyle:'italic'}}>
+                                                                <td colSpan="8" style={{textAlign:'center', padding:'40px', color:'#95a5a6', fontStyle:'italic'}}>
                                                                     No attendance records found
                                                                 </td>
                                                             </tr>
@@ -4831,6 +4834,7 @@ return (
                                                         
                                                         return (
                                                             <tr key={`${recordDate}-${operator?.id || idx}`}>
+                                                                <td style={{textAlign:'center', fontWeight:600, color:'#7f8c8d'}}>{idx + 1}</td>
                                                                 <td style={{fontWeight:600}}>{recordDate || '-'}</td>
                                                                 <td style={{fontWeight:600}}>{record.name || '-'}</td>
                                                                 <td>{operator?.department || '-'}</td>
