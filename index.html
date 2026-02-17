@@ -4287,6 +4287,13 @@ return (
                                 <div style={{padding:'20px', overflowY:'auto', flex:1}}>
                                     {/* Long Absence Alert Banner */}
                                     {(() => {
+                                        // 주말 여부 확인 함수
+                                        const isWeekend = (dateStr) => {
+                                            const date = new Date(dateStr);
+                                            const day = date.getDay();
+                                            return day === 0 || day === 6; // 0 = Sunday, 6 = Saturday
+                                        };
+                                        
                                         // 모든 체크리스트 날짜 추출
                                         const allChecklistDates = [...new Set((dataManager.data.checklists || []).map(c => {
                                             const d = (c.date || '').toString().trim();
@@ -4298,17 +4305,20 @@ return (
                                         
                                         if (allChecklistDates.length === 0) return null;
                                         
+                                        // 주말 제외한 근무일만 필터링
+                                        const workingDates = allChecklistDates.filter(date => !isWeekend(date));
+                                        
                                         const allOperators = dataManager.getBankstownOperators();
                                         const longAbsentOperators = [];
                                         
-                                        // 각 Operator의 연속 결근일 계산
+                                        // 각 Operator의 연속 결근일 계산 (근무일 기준)
                                         allOperators.forEach(operator => {
                                             if (operator.status === 'Inactive') return; // Inactive는 제외
                                             
                                             let consecutiveAbsent = 0;
-                                            const recentDates = allChecklistDates.slice(0, 28); // 최근 4주
+                                            const recentWorkingDates = workingDates.slice(0, 20); // 최근 20 근무일 (약 4주)
                                             
-                                            for (const date of recentDates) {
+                                            for (const date of recentWorkingDates) {
                                                 const rollCallRecord = attendanceRecords.find(r => {
                                                     return r.date === date && normalizeName(r.name) === normalizeName(operator.name);
                                                 });
@@ -4349,9 +4359,9 @@ return (
                                                             Long Absence Alert
                                                         </h4>
                                                         <p style={{margin:'5px 0 0 0', fontSize:'13px', color:'#555'}}>
-                                                            {criticalCount > 0 && `${criticalCount} operator(s) absent for 4+ weeks`}
+                                                            {criticalCount > 0 && `${criticalCount} operator(s) absent for 4+ weeks (20+ working days)`}
                                                             {criticalCount > 0 && warningCount > 0 && ', '}
-                                                            {warningCount > 0 && `${warningCount} operator(s) absent for 2+ weeks`}
+                                                            {warningCount > 0 && `${warningCount} operator(s) absent for 2+ weeks (10+ working days)`}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -4373,7 +4383,7 @@ return (
                                                                 fontSize:'12px',
                                                                 fontWeight:600
                                                             }}
-                                                            title={`${op.days}일 연속 결근`}
+                                                            title={`${op.days} working days consecutive absence`}
                                                         >
                                                             {op.name} ({op.days} days)
                                                         </button>
