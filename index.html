@@ -1910,7 +1910,9 @@ class DataManager {
                                         <label>Classes</label>
                                         <input type="text" value={formData.classes} onChange={(e) => setFormData({...formData, classes: e.target.value})} />
                                     </div>
+                                </div>
 
+                                <div className="form-row">
                                     <div className="form-field">
                                       <label>Shift</label>
                                       <select
@@ -1922,9 +1924,6 @@ class DataManager {
                                         <option value="PM">PM</option>
                                       </select>
                                     </div>
-                                </div>
-
-                                <div className="form-row">
                                     <div className="form-field">
                                         <label>Agency</label>
                                         <input type="text" value={formData.agency || ''} onChange={(e) => setFormData({...formData, agency: e.target.value})} placeholder="Enter agency name" />
@@ -4269,7 +4268,7 @@ return (
                                     }} style={{background:'none', border:'none', fontSize:'24px', cursor:'pointer', color:'#95a5a6'}}>✕</button>
                                 </div>
                                 <div style={{padding:'20px', overflowY:'auto', flex:1}}>
-                                    {/* 장기 결근자 알림 배너 */}
+                                    {/* Long Absence Alert Banner */}
                                     {(() => {
                                         // 모든 체크리스트 날짜 추출
                                         const allChecklistDates = [...new Set((dataManager.data.checklists || []).map(c => {
@@ -4330,12 +4329,12 @@ return (
                                                     <span style={{fontSize:'24px'}}>{criticalCount > 0 ? '🔴' : '🟡'}</span>
                                                     <div>
                                                         <h4 style={{margin:0, color: criticalCount > 0 ? '#e74c3c' : '#f39c12'}}>
-                                                            장기 결근자 알림
+                                                            Long Absence Alert
                                                         </h4>
                                                         <p style={{margin:'5px 0 0 0', fontSize:'13px', color:'#555'}}>
-                                                            {criticalCount > 0 && `${criticalCount}명의 4주 이상 결근자`}
+                                                            {criticalCount > 0 && `${criticalCount} operator(s) absent for 4+ weeks`}
                                                             {criticalCount > 0 && warningCount > 0 && ', '}
-                                                            {warningCount > 0 && `${warningCount}명의 2주 이상 결근자`}
+                                                            {warningCount > 0 && `${warningCount} operator(s) absent for 2+ weeks`}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -4359,7 +4358,7 @@ return (
                                                             }}
                                                             title={`${op.days}일 연속 결근`}
                                                         >
-                                                            {op.name} ({op.days}일)
+                                                            {op.name} ({op.days} days)
                                                         </button>
                                                     ))}
                                                 </div>
