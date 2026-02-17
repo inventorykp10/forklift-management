@@ -784,7 +784,7 @@ class DataManager {
             }
 
             getBankstownOperators() {
-                return (this.data.operators || []).filter(o => (o.group || '').toLowerCase().includes('bankstown'));
+                return (this.data.operators || []);
             }
 
             addAuditLog(action, details) {
