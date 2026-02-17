@@ -771,13 +771,12 @@ class DataManager {
             }
 
             migrateMaintenance(records) {
-                // completedDate → repairCompletionDate 로 통일, completedDate 제거
                 const toDMY = (val) => {
                     if (!val) return '';
-                    const s = String(val).split(' ')[0]; // remove timestamp
+                    const s = String(val).split(' ')[0];
                     const p = s.split('-');
-                    if (p.length === 3 && p[0].length === 4) return `${p[2]}-${p[1]}-${p[0]}`; // YYYY-MM-DD → DD-MM-YYYY
-                    return s; // already DD-MM-YYYY
+                    if (p.length===3 && p[0].length===4) return `${p[2]}-${p[1]}-${p[0]}`;
+                    return s;
                 };
                 let changed = false;
                 const migrated = records.map(m => {
@@ -792,9 +791,7 @@ class DataManager {
                     }
                     return m;
                 });
-                if (changed) {
-                    localStorage.setItem('forklift_maintenance', JSON.stringify(migrated));
-                }
+                if (changed) localStorage.setItem('forklift_maintenance', JSON.stringify(migrated));
                 return migrated;
             }
 
@@ -991,7 +988,7 @@ class DataManager {
                     }));
                 }
                 
-                // Maintenance의 경우 컬럼 정리 (completedDate 제외, repairCompletionDate만)
+                // Maintenance 컬럼 정리 (completedDate 제외)
                 if (dataType === 'maintenance') {
                     data = data.map(m => ({
                         'id': m.id,
@@ -2366,7 +2363,7 @@ class DataManager {
                 if (datePart.includes('-')) {
                     const parts = datePart.split('-');
                     if (parts.length === 3) {
-                        if (parts[0].length === 4) return `${parts[2]}-${parts[1]}-${parts[0]}`; // YYYY-MM-DD → DD-MM-YYYY
+                        if (parts[0].length === 4) return `${parts[2]}-${parts[1]}-${parts[0]}`;
                         return datePart; // Already DD-MM-YYYY
                     }
                 }
@@ -2492,6 +2489,7 @@ class DataManager {
                 if (p.length===3 && p[0].length===4) return `${p[2]}-${p[1]}-${p[0]}`;
                 return iso;
             };
+
             const [formData, setFormData] = useState(() => {
                 const base = record ? {...record} : {
                     logNo: generateLogNo(), unitNo: '', dateReported: '',
@@ -2502,6 +2500,29 @@ class DataManager {
                 base._completionDateISO = record ? dmyToISO(record.repairCompletionDate) : '';
                 return base;
             });
+
+            // Auto-status helpers
+            const handleDateReportedChange = (iso) => {
+                setFormData(prev => ({
+                    ...prev,
+                    _dateReportedISO: iso,
+                    // Only auto-set to Pending if not already Completed
+                    status: iso && prev.status === 'In Progress' ? 'In Progress'
+                          : iso && prev._completionDateISO ? 'Completed'
+                          : iso ? 'Pending'
+                          : prev.status
+                }));
+            };
+
+            const handleCompletionDateChange = (iso) => {
+                setFormData(prev => ({
+                    ...prev,
+                    _completionDateISO: iso,
+                    // Completion date set → Completed; cleared → Pending
+                    status: iso ? 'Completed' : (prev._dateReportedISO ? 'Pending' : prev.status)
+                }));
+            };
+
             const handleSubmit = (e) => {
                 e.preventDefault();
                 const saveData = {...formData};
@@ -2553,7 +2574,7 @@ class DataManager {
                                         <label>Date Reported *</label>
                                         <input type="date"
                                             value={formData._dateReportedISO}
-                                            onChange={(e) => setFormData({...formData, _dateReportedISO: e.target.value})}
+                                            onChange={(e) => handleDateReportedChange(e.target.value)}
                                             required
                                         />
                                     </div>
@@ -2610,7 +2631,7 @@ class DataManager {
                                         <label>Completion Date</label>
                                         <input type="date"
                                             value={formData._completionDateISO || ''}
-                                            onChange={(e) => setFormData({...formData, _completionDateISO: e.target.value})}
+                                            onChange={(e) => handleCompletionDateChange(e.target.value)}
                                         />
                                     </div>
                                 </div>
