@@ -1348,6 +1348,7 @@ class DataManager {
             const [filterOperator, setFilterOperator] = useState('all');
             const [filterDepartment, setFilterDepartment] = useState('all');
             const [filterShift, setFilterShift] = useState('all');
+            const [filterStatus, setFilterStatus] = useState('all');
             
             // Refresh operators list when component becomes visible
             useEffect(() => {
@@ -1521,7 +1522,9 @@ class DataManager {
                 
                 const matchesShift = filterShift === 'all' || (o.shift || '').toLowerCase() === filterShift.toLowerCase();
                 
-                return matchesSearch && matchesOperator && matchesDepartment && matchesShift;
+                const matchesStatus = filterStatus === 'all' || (o.status || 'Active').toLowerCase() === filterStatus.toLowerCase();
+                
+                return matchesSearch && matchesOperator && matchesDepartment && matchesShift && matchesStatus;
             });
 
             const handleAdd = () => {
@@ -1599,8 +1602,13 @@ class DataManager {
                                     <option key={shift} value={shift}>{shift}</option>
                                 ))}
                             </select>
-                            {(filterOperator !== 'all' || filterDepartment !== 'all' || filterShift !== 'all') && (
-                                <button onClick={() => {setFilterOperator('all'); setFilterDepartment('all'); setFilterShift('all');}} className="btn btn-secondary" style={{padding: '8px 12px'}}>Clear</button>
+                            <select className="filter-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                                <option value="all">All Status</option>
+                                <option value="Active">Active</option>
+                                <option value="Inactive">Inactive</option>
+                            </select>
+                            {(filterOperator !== 'all' || filterDepartment !== 'all' || filterShift !== 'all' || filterStatus !== 'all') && (
+                                <button onClick={() => {setFilterOperator('all'); setFilterDepartment('all'); setFilterShift('all'); setFilterStatus('all');}} className="btn btn-secondary" style={{padding: '8px 12px'}}>Clear</button>
                             )}
                         </div>
 
@@ -1613,6 +1621,7 @@ class DataManager {
                                         <th>License No</th>
                                         <th>Department</th>
                                         <th>Shift</th>
+                                        <th>Agency</th>
                                         <th>Valid From</th>
                                         <th>Expiry</th>
                                         <th>Classes</th>
@@ -1634,6 +1643,7 @@ class DataManager {
                                                 <td>{op.licenseNo}</td>
                                                 <td>{op.department || '-'}</td>
                                                 <td>{op.shift || '-'}</td>
+                                                <td>{op.agency || '-'}</td>
                                                 <td>{op.validFrom}</td>
                                                 <td style={expiryStyle}>{expiryDisplay}</td>
                                                 <td>{op.classes}</td>
@@ -1692,6 +1702,14 @@ class DataManager {
                                     <div style={{marginBottom: '12px'}}>
                                         <strong style={{color: '#7f8c8d'}}>Department:</strong>
                                         <div style={{marginTop: '4px', fontSize: '15px'}}>{operator.department || '-'}</div>
+                                    </div>
+                                    <div style={{marginBottom: '12px'}}>
+                                        <strong style={{color: '#7f8c8d'}}>Shift:</strong>
+                                        <div style={{marginTop: '4px', fontSize: '15px'}}>{operator.shift || '-'}</div>
+                                    </div>
+                                    <div style={{marginBottom: '12px'}}>
+                                        <strong style={{color: '#7f8c8d'}}>Agency:</strong>
+                                        <div style={{marginTop: '4px', fontSize: '15px'}}>{operator.agency || '-'}</div>
                                     </div>
                                     <div style={{marginBottom: '12px'}}>
                                         <strong style={{color: '#7f8c8d'}}>Status:</strong>
@@ -1818,6 +1836,7 @@ class DataManager {
                 assessmentDate: '',
                 assessorName: 'Joshua Odowd / Rudy Djie',
                 status: 'Active',
+                agency: '',
                 terminationDate: '',
                 terminationReason: '',
                 terminationDetail: '',
@@ -1902,6 +1921,13 @@ class DataManager {
                                         <option value="AM">AM</option>
                                         <option value="PM">PM</option>
                                       </select>
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-field">
+                                        <label>Agency</label>
+                                        <input type="text" value={formData.agency || ''} onChange={(e) => setFormData({...formData, agency: e.target.value})} placeholder="Enter agency name" />
                                     </div>
                                 </div>
 
