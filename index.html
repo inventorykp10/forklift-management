@@ -763,11 +763,39 @@ class DataManager {
                     ]),
                     forklifts: this.loadData('forklifts', []),
                     operators: this.loadData('operators', []),
-                    maintenance: this.loadData('maintenance', []),
+                    maintenance: this.migrateMaintenance(this.loadData('maintenance', [])),
                     checklists: this.loadData('checklists', []),
                     incidents: this.loadData('incidents', []),
                     auditLog: this.loadData('auditLog', [])
                 };
+            }
+
+            migrateMaintenance(records) {
+                // completedDate → repairCompletionDate 로 통일, completedDate 제거
+                const toDMY = (val) => {
+                    if (!val) return '';
+                    const s = String(val).split(' ')[0]; // remove timestamp
+                    const p = s.split('-');
+                    if (p.length === 3 && p[0].length === 4) return `${p[2]}-${p[1]}-${p[0]}`; // YYYY-MM-DD → DD-MM-YYYY
+                    return s; // already DD-MM-YYYY
+                };
+                let changed = false;
+                const migrated = records.map(m => {
+                    if ('completedDate' in m) {
+                        const rec = {...m};
+                        if (!rec.repairCompletionDate && rec.completedDate) {
+                            rec.repairCompletionDate = toDMY(rec.completedDate);
+                        }
+                        delete rec.completedDate;
+                        changed = true;
+                        return rec;
+                    }
+                    return m;
+                });
+                if (changed) {
+                    localStorage.setItem('forklift_maintenance', JSON.stringify(migrated));
+                }
+                return migrated;
             }
 
             loadData(key, defaultValue) {
@@ -963,6 +991,24 @@ class DataManager {
                     }));
                 }
                 
+                // Maintenance의 경우 컬럼 정리 (completedDate 제외, repairCompletionDate만)
+                if (dataType === 'maintenance') {
+                    data = data.map(m => ({
+                        'id': m.id,
+                        'logNo': m.logNo,
+                        'unitNo': m.unitNo,
+                        'dateReported': m.dateReported,
+                        'issue': m.issue,
+                        'provider': m.provider,
+                        'repairRequested': m.repairRequested,
+                        'status': m.status,
+                        'cost': m.cost,
+                        'repairCompletionDate': m.repairCompletionDate || '',
+                        'repairDetails': m.repairDetails,
+                        'reportedBy': m.reportedBy
+                    }));
+                }
+
                 // Forklifts의 경우 컬럼 순서 지정
                 if (dataType === 'forklifts') {
                     data = data.map(f => ({
@@ -1859,145 +1905,66 @@ class DataManager {
             );
         }
 
-        // Masked Date Input Component - DD-MM-YYYY always visible, cursor jumps sections
         function MaskedDateInput({ value, onChange, style }) {
             const inputRef = React.useRef(null);
-            const MASK = 'DD-MM-YYYY';
-
-            // Parse stored DD-MM-YYYY string into digit array [d1,d2,m1,m2,y1,y2,y3,y4]
             const parseDigits = (val) => {
-                if (!val || val === MASK) return Array(8).fill('');
+                if (!val) return Array(8).fill('');
                 const parts = val.split('-');
                 if (parts.length === 3) {
                     const [dd, mm, yyyy] = parts;
-                    return [
-                        dd[0] || '', dd[1] || '',
-                        mm[0] || '', mm[1] || '',
-                        yyyy[0] || '', yyyy[1] || '', yyyy[2] || '', yyyy[3] || ''
-                    ];
+                    return [dd[0]||'',dd[1]||'',mm[0]||'',mm[1]||'',yyyy[0]||'',yyyy[1]||'',yyyy[2]||'',yyyy[3]||''];
                 }
                 return Array(8).fill('');
             };
-
             const [digits, setDigits] = React.useState(() => parseDigits(value));
-
-            // Sync when value changes externally
-            React.useEffect(() => {
-                setDigits(parseDigits(value));
-            }, [value]);
-
-            // Digit index → cursor position in display string "DD-MM-YYYY"
-            // Positions: D0=0, D1=1, -=2(skip), M0=3, M1=4, -=5(skip), Y0=6, Y1=7, Y2=8, Y3=9
-            const digitToPos = [0, 1, 3, 4, 6, 7, 8, 9];
-            const posToDigit = { 0:0, 1:1, 3:2, 4:3, 6:4, 7:5, 8:6, 9:7 };
-
-            const buildDisplay = (d) => {
-                const dd = (d[0] || 'D') + (d[1] || 'D');
-                const mm = (d[2] || 'M') + (d[3] || 'M');
-                const yyyy = (d[4] || 'Y') + (d[5] || 'Y') + (d[6] || 'Y') + (d[7] || 'Y');
-                return `${dd}-${mm}-${yyyy}`;
-            };
-
+            React.useEffect(() => { setDigits(parseDigits(value)); }, [value]);
+            const digitToPos = [0,1,3,4,6,7,8,9];
+            const posToDigit = {0:0,1:1,3:2,4:3,6:4,7:5,8:6,9:7};
+            const buildDisplay = (d) => `${d[0]||'D'}${d[1]||'D'}-${d[2]||'M'}${d[3]||'M'}-${d[4]||'Y'}${d[5]||'Y'}${d[6]||'Y'}${d[7]||'Y'}`;
             const commitChange = (newDigits) => {
                 setDigits(newDigits);
-                const allFilled = newDigits.every(d => d !== '');
-                if (allFilled) {
-                    const dd = newDigits[0] + newDigits[1];
-                    const mm = newDigits[2] + newDigits[3];
-                    const yyyy = newDigits[4] + newDigits[5] + newDigits[6] + newDigits[7];
-                    onChange(`${dd}-${mm}-${yyyy}`);
-                } else {
-                    // Pass partial value so form state tracks it
-                    const dd = (newDigits[0] || '_') + (newDigits[1] || '_');
-                    const mm = (newDigits[2] || '_') + (newDigits[3] || '_');
-                    const yyyy = newDigits.slice(4).map(d => d || '_').join('');
-                    onChange(`${dd}-${mm}-${yyyy}`.includes('_') ? '' : `${dd}-${mm}-${yyyy}`);
-                }
+                if (newDigits.every(d => d !== '')) {
+                    onChange(`${newDigits[0]+newDigits[1]}-${newDigits[2]+newDigits[3]}-${newDigits.slice(4).join('')}`);
+                } else { onChange(''); }
             };
-
             const setCursorToDigit = (idx) => {
-                const el = inputRef.current;
-                if (!el) return;
-                const pos = digitToPos[Math.min(idx, 7)];
-                setTimeout(() => el.setSelectionRange(pos, pos + 1), 0);
+                const el = inputRef.current; if (!el) return;
+                const pos = digitToPos[Math.min(idx,7)];
+                setTimeout(() => el.setSelectionRange(pos, pos+1), 0);
             };
-
             const handleClick = (e) => {
                 const pos = e.target.selectionStart;
-                // Find nearest digit position
-                const nearest = Object.keys(posToDigit).map(Number).reduce((a, b) =>
-                    Math.abs(b - pos) < Math.abs(a - pos) ? b : a
-                );
-                const digitIdx = posToDigit[nearest];
-                setCursorToDigit(digitIdx);
+                const nearest = Object.keys(posToDigit).map(Number).reduce((a,b) => Math.abs(b-pos)<Math.abs(a-pos)?b:a);
+                setCursorToDigit(posToDigit[nearest]);
             };
-
             const handleKeyDown = (e) => {
                 const el = inputRef.current;
                 const pos = el.selectionStart;
                 const digitIdx = posToDigit[pos];
-
                 if (digitIdx === undefined) {
-                    // Cursor on hyphen - move to next digit
-                    const nextPos = pos < 3 ? 3 : 6;
-                    el.setSelectionRange(nextPos, nextPos + 1);
-                    e.preventDefault();
-                    return;
+                    el.setSelectionRange(pos < 3 ? 3 : 6, (pos < 3 ? 3 : 6)+1);
+                    e.preventDefault(); return;
                 }
-
                 if (e.key >= '0' && e.key <= '9') {
                     e.preventDefault();
-                    const newDigits = [...digits];
-                    newDigits[digitIdx] = e.key;
-                    commitChange(newDigits);
-                    // Move to next position
-                    const next = digitIdx + 1;
-                    if (next <= 7) setCursorToDigit(next);
+                    const nd = [...digits]; nd[digitIdx] = e.key; commitChange(nd);
+                    if (digitIdx+1 <= 7) setCursorToDigit(digitIdx+1);
                 } else if (e.key === 'Backspace' || e.key === 'Delete') {
                     e.preventDefault();
-                    const newDigits = [...digits];
-                    newDigits[digitIdx] = '';
-                    commitChange(newDigits);
-                    // Move back
-                    if (e.key === 'Backspace' && digitIdx > 0) setCursorToDigit(digitIdx - 1);
-                } else if (e.key === 'ArrowLeft') {
-                    e.preventDefault();
-                    if (digitIdx > 0) setCursorToDigit(digitIdx - 1);
-                } else if (e.key === 'ArrowRight') {
-                    e.preventDefault();
-                    if (digitIdx < 7) setCursorToDigit(digitIdx + 1);
-                } else if (e.key === 'Tab') {
-                    // Allow tab to move to next field
-                    return;
-                } else {
-                    e.preventDefault();
-                }
+                    const nd = [...digits]; nd[digitIdx] = ''; commitChange(nd);
+                    if (e.key === 'Backspace' && digitIdx > 0) setCursorToDigit(digitIdx-1);
+                } else if (e.key === 'ArrowLeft') { e.preventDefault(); if (digitIdx>0) setCursorToDigit(digitIdx-1);
+                } else if (e.key === 'ArrowRight') { e.preventDefault(); if (digitIdx<7) setCursorToDigit(digitIdx+1);
+                } else if (e.key !== 'Tab') { e.preventDefault(); }
             };
-
             const handleFocus = () => {
-                // Find first empty digit
-                const firstEmpty = digits.findIndex(d => d === '');
-                setCursorToDigit(firstEmpty === -1 ? 0 : firstEmpty);
+                const first = digits.findIndex(d => d==='');
+                setCursorToDigit(first===-1 ? 0 : first);
             };
-
-            const baseStyle = {
-                fontFamily: 'monospace',
-                letterSpacing: '1px',
-                ...(style || {})
-            };
-
             return (
-                <input
-                    ref={inputRef}
-                    type="text"
-                    value={buildDisplay(digits)}
-                    onKeyDown={handleKeyDown}
-                    onClick={handleClick}
-                    onFocus={handleFocus}
-                    onChange={() => {}}
-                    readOnly={false}
-                    style={baseStyle}
-                />
+                <input ref={inputRef} type="text" value={buildDisplay(digits)}
+                    onKeyDown={handleKeyDown} onClick={handleClick} onFocus={handleFocus} onChange={() => {}}
+                    style={{fontFamily:'monospace', letterSpacing:'1px', ...(style||{})}} />
             );
         }
 
@@ -2398,8 +2365,9 @@ class DataManager {
                 const datePart = dateStr.split(' ')[0];
                 if (datePart.includes('-')) {
                     const parts = datePart.split('-');
-                    if (parts.length === 3 && parts[0].length === 4) {
-                        return `${parts[2]}-${parts[1]}-${parts[0]}`;
+                    if (parts.length === 3) {
+                        if (parts[0].length === 4) return `${parts[2]}-${parts[1]}-${parts[0]}`; // YYYY-MM-DD → DD-MM-YYYY
+                        return datePart; // Already DD-MM-YYYY
                     }
                 }
                 return datePart;
@@ -2524,7 +2492,6 @@ class DataManager {
                 if (p.length===3 && p[0].length===4) return `${p[2]}-${p[1]}-${p[0]}`;
                 return iso;
             };
-
             const [formData, setFormData] = useState(() => {
                 const base = record ? {...record} : {
                     logNo: generateLogNo(), unitNo: '', dateReported: '',
@@ -2535,7 +2502,6 @@ class DataManager {
                 base._completionDateISO = record ? dmyToISO(record.repairCompletionDate) : '';
                 return base;
             });
-
             const handleSubmit = (e) => {
                 e.preventDefault();
                 const saveData = {...formData};
@@ -2585,8 +2551,7 @@ class DataManager {
                                 <div className="form-row">
                                     <div className="form-field">
                                         <label>Date Reported *</label>
-                                        <input 
-                                            type="date"
+                                        <input type="date"
                                             value={formData._dateReportedISO}
                                             onChange={(e) => setFormData({...formData, _dateReportedISO: e.target.value})}
                                             required
@@ -2643,8 +2608,7 @@ class DataManager {
                                     </div>
                                     <div className="form-field">
                                         <label>Completion Date</label>
-                                        <input
-                                            type="date"
+                                        <input type="date"
                                             value={formData._completionDateISO || ''}
                                             onChange={(e) => setFormData({...formData, _completionDateISO: e.target.value})}
                                         />
