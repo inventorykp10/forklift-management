@@ -2249,7 +2249,10 @@ class DataManager {
                 }
             };
 
+            const [emailPrompt, setEmailPrompt] = React.useState(null);
+
             const handleSave = (recordData) => {
+                const isNew = !editingRecord;
                 if (editingRecord) {
                     dataManager.updateMaintenance(editingRecord.id, recordData);
                 } else {
@@ -2257,6 +2260,43 @@ class DataManager {
                 }
                 setRecords([...dataManager.data.maintenance]);
                 setShowModal(false);
+                setEditingRecord(null);
+
+                // Show email prompt only for new records
+                if (isNew) {
+                    setEmailPrompt(recordData);
+                }
+            };
+
+            const openOutlook = (record) => {
+                const to = 'ServiceAU@rentcorp.com.au';
+                const cc = 'jaesung@rentcorp.com.au';
+                const subject = encodeURIComponent(`Forklift Repair Request - ${record.logNo} - Unit ${record.unitNo}`);
+                const body = encodeURIComponent(
+                    `Dear Rentcorp Service Team,
+
+` +
+                    `Please be advised of the following forklift repair request:
+
+` +
+                    `Log No:    ${record.logNo}
+` +
+                    `Unit No:   ${record.unitNo}
+` +
+                    `Date:      ${record.dateReported}
+` +
+                    `Issue:     ${record.issue}
+
+` +
+                    `Please arrange for the repair at your earliest convenience.
+
+` +
+                    `Kind regards,
+` +
+                    `Samsung SDS Cello - Bankstown`
+                );
+                window.location.href = `mailto:${to}?cc=${cc}&subject=${subject}&body=${body}`;
+                setEmailPrompt(null);
             };
 
             return (
@@ -2350,6 +2390,46 @@ class DataManager {
                             record={viewingRecord}
                             onClose={() => setShowDetailModal(false)}
                         />
+                    )}
+
+                    {emailPrompt && (
+                        <div className="modal-overlay" onClick={() => setEmailPrompt(null)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '480px'}}>
+                                <div className="modal-header" style={{background: '#2c3e50'}}>
+                                    <h2 style={{color: '#fff', fontSize: '16px'}}>✉️ Send Repair Request Email?</h2>
+                                    <button className="modal-close" onClick={() => setEmailPrompt(null)} style={{color: '#fff'}}>✕</button>
+                                </div>
+                                <div className="modal-body" style={{padding: '24px'}}>
+                                    <p style={{marginBottom: '16px', color: '#555', lineHeight: '1.6'}}>
+                                        Maintenance record <strong>{emailPrompt.logNo}</strong> has been saved.<br/>
+                                        Would you like to send a repair request email to Rentcorp?
+                                    </p>
+                                    <div style={{background: '#f8f9fa', borderRadius: '8px', padding: '14px', fontSize: '13px', color: '#444', lineHeight: '1.8', marginBottom: '20px'}}>
+                                        <div><strong>To:</strong> ServiceAU@rentcorp.com.au</div>
+                                        <div><strong>CC:</strong> jaesung@rentcorp.com.au</div>
+                                        <div><strong>Subject:</strong> Forklift Repair Request - {emailPrompt.logNo} - Unit {emailPrompt.unitNo}</div>
+                                        <div style={{marginTop: '8px', borderTop: '1px solid #ddd', paddingTop: '8px'}}>
+                                            <div><strong>Log No:</strong> {emailPrompt.logNo}</div>
+                                            <div><strong>Unit No:</strong> {emailPrompt.unitNo}</div>
+                                            <div><strong>Date:</strong> {emailPrompt.dateReported}</div>
+                                            <div><strong>Issue:</strong> {emailPrompt.issue}</div>
+                                        </div>
+                                    </div>
+                                    <div style={{display: 'flex', gap: '10px', justifyContent: 'flex-end'}}>
+                                        <button
+                                            onClick={() => setEmailPrompt(null)}
+                                            style={{padding: '10px 20px', background: '#95a5a6', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600}}>
+                                            Skip
+                                        </button>
+                                        <button
+                                            onClick={() => openOutlook(emailPrompt)}
+                                            style={{padding: '10px 20px', background: '#2c3e50', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600}}>
+                                            ✉️ Open Outlook
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     )}
                 </div>
             );
