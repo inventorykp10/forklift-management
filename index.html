@@ -1225,7 +1225,7 @@ class DataManager {
                             <img src={IMAGES.companyLogo} alt="Samsung SDS Cello" className="login-company-logo" />
                             <img src={IMAGES.forkliftIcon} alt="Icon" className="login-logo-img" />
                             <h1>Total Facilities Management System</h1>
-                            <span className="v3-badge">index_fms_2 · V1.0.2</span>
+                            <span className="v3-badge">V1.1.1</span>
                         </div>
                         
                         <div className="welcome-message">
@@ -1266,7 +1266,7 @@ class DataManager {
                     <div className="sidebar-header">
                         <img src={IMAGES.forkliftIcon} alt="Icon" className="sidebar-icon" />
                         <div className="sidebar-logo">Total FMS</div>
-                        <div style={{fontSize:'11px',color:'rgba(255,255,255,0.45)',marginTop:'4px',letterSpacing:'0.5px'}}>index_fms_2 · V1.0.2</div>
+                        <div style={{fontSize:'11px',color:'rgba(255,255,255,0.45)',marginTop:'4px',letterSpacing:'0.5px'}}>V1.1.1</div>
                         <img src={IMAGES.samsungLogo} alt="Logo" className="sidebar-header-logo" />
                     </div>
                     
@@ -3766,7 +3766,7 @@ class DataManager {
                                         <tr key={f.id}>
                                             <td><strong>{f.unitNo}</strong></td>
                                             <td>{f.type}</td>
-                                            <td style={{fontFamily:'monospace', fontSize:'12px', color:'#5a6c7d'}}>{f.serialNo || <span style={{color:'#bdc3c7'}}>—</span>}</td>
+                                            <td>{f.serialNo || <span style={{color:'#bdc3c7'}}>—</span>}</td>
                                             <td>{f.specification}</td>
                                             <td>{f.site}</td>
                                             <td>{f.group}</td>
@@ -5715,7 +5715,7 @@ return (
                                                 <td style={{fontWeight:700}}>{eq.name}</td>
                                                 <td><span style={{fontSize:'11px',background:'#e9ecef',padding:'2px 8px',borderRadius:'10px'}}>{eq.category||'-'}</span></td>
                                                 <td>{eq.manufacturer||'-'}</td>
-                                                <td style={{fontFamily:'monospace',fontSize:'12px'}}>{eq.serialNo||'-'}</td>
+                                                <td>{eq.serialNo||'-'}</td>
                                                 <td>{eq.commissionDate||'-'}</td>
                                                 <td>{eq.maintenanceSchedule||'-'}</td>
                                                 <td>{eq.nextMaintenance ? (
@@ -6226,7 +6226,7 @@ return (
                                                 <td>{t.trainingDate||'-'}</td>
                                                 <td>{t.expiryDate||'-'}</td>
                                                 <td>{t.trainerName||'-'}</td>
-                                                <td style={{fontFamily:'monospace',fontSize:'12px'}}>{t.certificateNo||'-'}</td>
+                                                <td>{t.certificateNo||'-'}</td>
                                                 <td><span style={{fontSize:'11px',fontWeight:700,padding:'3px 8px',borderRadius:'10px',color:st.color,background:st.bg}}>{st.label}</span></td>
                                                 <td><div className="action-icons">
                                                     <button className="icon-btn edit" onClick={()=>{setEditing(t);setShowModal(true);}}>✏️</button>
