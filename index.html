@@ -3760,6 +3760,8 @@ class DataManager {
             const [endDate, setEndDate] = useState(() => selectedDate);
             const [activeDate, setActiveDate] = useState(() => selectedDate);
             const [listView, setListView] = useState('ALL');
+            const [activePill, setActivePill] = useState('summary');
+            const [subPillView, setSubPillView] = useState('PRESENT');
             const [attendanceRecords, setAttendanceRecords] = useState(() => {
                 try {
                     return JSON.parse(localStorage.getItem('forklift_attendance_records') || '[]');
@@ -4050,14 +4052,27 @@ class DataManager {
                 }
                 missing.sort();
 
+                // Count total checklist sheets (including duplicates)
+                const checklistCount = (dataManager.data.checklists || []).filter(c => {
+                    const d = (c.date || '').toString().trim();
+                    let iso = '';
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) iso = d;
+                    else { const m2 = d.match(/^(\d{2})-(\d{2})-(\d{4})$/); if (m2) iso = `${m2[3]}-${m2[2]}-${m2[1]}`; }
+                    if (iso !== isoDate) return false;
+                    const cshift = String(c.shift || '').toUpperCase();
+                    if (selectedShift === 'ALL') return cshift === 'AM' || cshift === 'PM';
+                    return cshift === selectedShift;
+                }).length;
+
                 return {
                     date: isoDate,
-                    allOperatorsCount: presentOperators.size,  // 출근한 오퍼레이터 수
-                    submittedCount: submittedAndPresent.size,  // 출근자 중 제출한 수
+                    allOperatorsCount: presentOperators.size,
+                    submittedCount: submittedAndPresent.size,
                     missingCount: missing.length,
                     missing,
                     submittedList: Array.from(submittedAndPresent).sort(),
-                    attendanceCount: presentFromAttendance.size  // 전체 출근자 (참고용)
+                    attendanceCount: presentFromAttendance.size,
+                    checklistCount
                 };
             };
 
@@ -4074,7 +4089,7 @@ return (
                 <div>
                     <div className="content-header">
                         <div className="content-header-left">
-                            <h1>Compliance <span className="v3-badge">V7</span></h1>
+                            <h1>Compliance <span className="v3-badge">V8</span></h1>
                             <p>Attendance vs checklist submission</p>
                         </div>
                         <div className="content-header-right">
@@ -4083,454 +4098,358 @@ return (
                         </div>
                     </div>
 
-                    <div className="table-card">
-                        <div style={{padding:'15px 20px'}}>
-                            {/* Row 1: Title + Filters inline */}
-                            <div style={{display:'flex', alignItems:'center', flexWrap:'wrap', gap:'10px', marginBottom:'12px'}}>
-                                <h3 style={{margin:0, marginRight:'auto'}}>Status & Submission</h3>
-                                <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
-                                    <label style={{fontSize:'12px', color:'#7f8c8d', fontWeight:600, margin:0}}>From</label>
-                                    <input type="date" value={selectedDate} onChange={(e)=>setSelectedDate(e.target.value)} style={{padding:'4px 6px', fontSize:'13px', border:'1px solid #dfe6e9', borderRadius:'6px'}} />
-                                    <label style={{fontSize:'12px', color:'#7f8c8d', fontWeight:600, margin:0}}>To</label>
-                                    <input type="date" value={endDate} onChange={(e)=>setEndDate(e.target.value)} style={{padding:'4px 6px', fontSize:'13px', border:'1px solid #dfe6e9', borderRadius:'6px'}} />
-                                    <select value={selectedShift} onChange={(e)=>setSelectedShift(e.target.value)} style={{padding:'4px 8px', fontSize:'13px', border:'1px solid #dfe6e9', borderRadius:'6px', fontWeight:600}}>
-                                        <option value="ALL">All</option>
-                                        <option value="AM">AM</option>
-                                        <option value="PM">PM</option>
+                    {/* ── 3 PILLS ── */}
+                    <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'12px', marginBottom:'12px'}}>
+                        {[
+                            {
+                                key:'summary',
+                                label:'Summary',
+                                icon:'📅',
+                                number: isRange ? `${dateList.length} days` : (() => { const d = new Date(selectedDate+'T00:00:00'); return d.toLocaleDateString('en-AU',{day:'numeric',month:'short'}); })(),
+                                sub: isRange ? `${(() => { const d=new Date(selectedDate+'T00:00:00'); return d.toLocaleDateString('en-AU',{day:'numeric',month:'short'}); })()} – ${(() => { const d=new Date(endDate+'T00:00:00'); return d.toLocaleDateString('en-AU',{day:'numeric',month:'short'}); })()}` : 'single date',
+                                activeStyle:{borderColor:'#90bce8', background:'#f0f7ff'},
+                                barColor:'#3498db', labelColor:'#5a7fa0'
+                            },
+                            {
+                                key:'submission',
+                                label:'Submission',
+                                icon:'✅',
+                                number: `${submittedCount} / ${totalOperators}`,
+                                sub: `${missingCount} missing · ${active.checklistCount} sheets`,
+                                activeStyle:{borderColor:'#81c784', background:'#f0faf0'},
+                                barColor:'#27ae60', labelColor:'#2e7d32'
+                            },
+                            {
+                                key:'attendance',
+                                label:'Attendance',
+                                icon:'📋',
+                                number: (() => {
+                                    const ops = dataManager.getBankstownOperators();
+                                    const opSet = new Set(ops.map(o => normalizeName(o.name)));
+                                    if (dateList.length === 1) {
+                                        return attendanceRecords.filter(r => r.date === selectedDate && opSet.has(normalizeName(r.name))).length;
+                                    }
+                                    return attendanceRecords.filter(r => r.date >= selectedDate && r.date <= endDate && opSet.has(normalizeName(r.name))).length;
+                                })(),
+                                sub: isRange ? `${selectedDate} – ${endDate}` : `${selectedDate}`,
+                                activeStyle:{borderColor:'#f9cc6a', background:'#fef9ec'},
+                                barColor:'#f39c12', labelColor:'#b7770a'
+                            }
+                        ].map(pill => (
+                            <div key={pill.key}
+                                onClick={() => setActivePill(pill.key)}
+                                style={{
+                                    background: activePill===pill.key ? pill.activeStyle.background : 'white',
+                                    borderRadius:'14px',
+                                    border: activePill===pill.key ? `2px solid ${pill.activeStyle.borderColor}` : '1.5px solid #e9ecef',
+                                    boxShadow:'0 2px 8px rgba(0,0,0,0.05)',
+                                    cursor:'pointer', transition:'all 0.18s',
+                                    overflow:'hidden', position:'relative', userSelect:'none'
+                                }}
+                            >
+                                {activePill===pill.key && <div style={{position:'absolute',bottom:0,left:0,right:0,height:'3px',borderRadius:'0 0 12px 12px',background:pill.barColor}} />}
+                                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px 8px'}}>
+                                    <span style={{fontSize:'10px',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.7px',color:pill.labelColor}}>{pill.label}</span>
+                                    <span style={{fontSize:'20px',opacity:0.8}}>{pill.icon}</span>
+                                </div>
+                                <div style={{padding:'0 16px 14px'}}>
+                                    <div style={{fontSize:'28px',fontWeight:800,lineHeight:1,color:'#2c3e50'}}>{pill.number}</div>
+                                    <div style={{fontSize:'11px',color:'#95a5a6',marginTop:'3px'}}>{pill.sub}</div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* ══ PANEL: SUMMARY ══ */}
+                    {activePill === 'summary' && (
+                        <div className="table-card">
+                            <div style={{padding:'12px 18px',background:'#f8f9fa',borderBottom:'1px solid #e9ecef',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'10px'}}>
+                                <span style={{fontSize:'13px',fontWeight:700,color:'#2c3e50'}}>📅 Summary</span>
+                                <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+                                    <label style={{fontSize:'11px',color:'#7f8c8d',fontWeight:600}}>From</label>
+                                    <input type="date" value={selectedDate} onChange={e=>{setSelectedDate(e.target.value);setListView('SUMMARY');}} style={{padding:'5px 8px',fontSize:'12px',border:'1px solid #dfe6e9',borderRadius:'6px'}} />
+                                    <label style={{fontSize:'11px',color:'#7f8c8d',fontWeight:600}}>To</label>
+                                    <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} style={{padding:'5px 8px',fontSize:'12px',border:'1px solid #dfe6e9',borderRadius:'6px'}} />
+                                    <label style={{fontSize:'11px',color:'#7f8c8d',fontWeight:600}}>Shift</label>
+                                    <select value={selectedShift} onChange={e=>setSelectedShift(e.target.value)} style={{padding:'5px 8px',fontSize:'12px',border:'1px solid #dfe6e9',borderRadius:'6px',fontWeight:600}}>
+                                        <option value="ALL">All</option><option value="AM">AM</option><option value="PM">PM</option>
                                     </select>
                                 </div>
                             </div>
-
-                            {/* Row 2: Compact stat pills - clickable to toggle inline list */}
-                            <div style={{display:'flex', gap:'10px', marginBottom:'0'}}>
-                                {[
-                                    {key:'SUMMARY', label:'Summary', count: `${submittedCount}/${totalOperators}`, icon:'📊', bg:'#f0f7ff', border:'#d6e8f7', labelColor:'#5a7fa0'},
-                                    {key:'ATTENDANCE', label:'Attendance', count: attendanceRecords.filter(r => {
-                                        const normalized = normalizeName(r.name);
-                                        const operator = dataManager.getBankstownOperators().find(o => normalizeName(o.name) === normalized);
-                                        if (!operator) return false;
-                                        // 날짜 범위 필터링 추가
-                                        if (dateList.length === 1) {
-                                            return r.date === selectedDate;
-                                        } else {
-                                            return r.date >= selectedDate && r.date <= endDate;
-                                        }
-                                    }).length, icon:'📋', bg:'#fef5e7', border:'#f9e79f', labelColor:'#d68910'}
-                                ].map(pill => (
-                                    <div key={pill.key}
-                                        onClick={() => {
-                                            if (pill.key === 'ATTENDANCE') {
-                                                setShowAttendanceModal(true);
-                                            } else {
-                                                setListView(listView === pill.key ? null : pill.key);
-                                            }
-                                        }}
-                                        style={{
-                                            flex:1, display:'flex', alignItems:'center', justifyContent:'space-between',
-                                            padding:'10px 14px', 
-                                            background: listView === pill.key ? pill.bg : '#fafafa',
-                                            borderRadius:'10px', cursor:'pointer',
-                                            border: listView === pill.key ? `2px solid ${pill.border}` : '1px solid #e9ecef',
-                                            transition:'all 0.15s', position:'relative'
-                                        }}>
-                                        <div>
-                                            <div style={{fontSize:'11px', color: pill.labelColor, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.5px'}}>{pill.label}</div>
-                                            <div style={{fontSize:'24px', fontWeight:800, color:'#2c3e50', lineHeight:'1.1'}}>{pill.count}</div>
+                            {isRange && (
+                                <>
+                                    <div style={{padding:'10px 18px',background:'#f8f9fa',borderBottom:'1px solid #e9ecef',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                                        <span style={{fontSize:'13px',fontWeight:700}}>Range Summary ({dateList.length} days)</span>
+                                    </div>
+                                    <div className="table-wrapper">
+                                        <table className="data-table" style={{marginBottom:0}}>
+                                            <thead>
+                                                <tr>
+                                                    <th>Date</th><th>Present</th><th>Submitted</th><th>Missing</th><th>Checklists</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {rangeStats.map(r => (
+                                                    <tr key={r.date}
+                                                        onDoubleClick={() => { setActiveDate(r.date); setListView('SUMMARY'); }}
+                                                        style={{cursor:'pointer', background: activeDate===r.date && listView==='SUMMARY' ? '#f0f7ff' : 'inherit'}}
+                                                        title="Double-click to view details">
+                                                        <td><strong>{r.date}</strong></td>
+                                                        <td>{r.allOperatorsCount}</td>
+                                                        <td>{r.submittedCount}</td>
+                                                        <td style={{color:r.missingCount>0?'#c62828':'inherit',fontWeight:r.missingCount>0?700:400}}>{r.missingCount}</td>
+                                                        <td>
+                                                            {r.checklistCount}
+                                                            {r.checklistCount > r.submittedCount && <span style={{color:'#8e24aa',fontSize:'11px',fontWeight:600,marginLeft:'4px'}}>(+{r.checklistCount - r.submittedCount} dup)</span>}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div style={{padding:'6px 16px 10px',fontSize:'11px',color:'#7f8c8d'}}>💡 더블클릭 → 해당 날짜 오퍼레이터 목록 펼침</div>
+                                </>
+                            )}
+                            {(listView === 'SUMMARY' || !isRange) && (() => {
+                                const targetDate = isRange ? activeDate : selectedDate;
+                                const dateCalc = isRange ? (rangeStats.find(r=>r.date===activeDate) || calcForDate(activeDate)) : active;
+                                const operatorMap = new Map();
+                                dataManager.getBankstownOperators().forEach(o => operatorMap.set(normalizeName(o.name||''), o));
+                                const checklistMap = new Map();
+                                (dataManager.data.checklists||[]).forEach(c => {
+                                    const d=(c.date||'').toString().trim(); let iso='';
+                                    if(/^\d{4}-\d{2}-\d{2}$/.test(d)) iso=d;
+                                    else { const m2=d.match(/^(\d{2})-(\d{2})-(\d{4})$/); if(m2) iso=`${m2[3]}-${m2[2]}-${m2[1]}`; }
+                                    if(iso===targetDate) {
+                                        const cshift=String(c.shift||'').toUpperCase();
+                                        const wanted=selectedShift.toUpperCase();
+                                        if(wanted==='ALL'||cshift===wanted) { const key=normalizeName(c.operator||''); if(key) checklistMap.set(key,c); }
+                                    }
+                                });
+                                const allNames=[...(dateCalc.submittedList||[]),...(dateCalc.missing||[])].sort();
+                                const rows=allNames.map(n => {
+                                    const op=operatorMap.get(n)||{};
+                                    const cl=checklistMap.get(n)||{};
+                                    const sub=(dateCalc.submittedList||[]).includes(n);
+                                    return {name:displayName(n),unit:cl.unitNo||'-',department:cl.department||op.department||'-',shift:cl.shift||op.shift||'-',status:sub?'Submitted':'Missing',normalized:n};
+                                });
+                                const exportToExcel = () => {
+                                    const exportType=prompt('Export Type:\n1. Single Date\n2. Date Range\n\nEnter 1 or 2:','1');
+                                    if(!exportType) return;
+                                    let exportDates=[];
+                                    if(exportType==='1') { const d=prompt('Enter Date (YYYY-MM-DD):',targetDate); if(!d) return; if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){alert('Invalid date format.');return;} exportDates=[d]; }
+                                    else if(exportType==='2') { const s=prompt('Start Date (YYYY-MM-DD):',selectedDate); if(!s) return; const e2=prompt('End Date (YYYY-MM-DD):',endDate); if(!e2) return; if(!/^\d{4}-\d{2}-\d{2}$/.test(s)||!/^\d{4}-\d{2}-\d{2}$/.test(e2)){alert('Invalid date format.');return;} exportDates=enumerateDates(s,e2); }
+                                    else { alert('Invalid selection.'); return; }
+                                    if(exportDates.length===0){alert('No dates selected.');return;}
+                                    const allData=[];
+                                    for(const date of exportDates){
+                                        const dc=calcForDate(date);
+                                        const opMap2=new Map(); dataManager.getBankstownOperators().forEach(o=>opMap2.set(normalizeName(o.name||''),o));
+                                        const clMap2=new Map();
+                                        (dataManager.data.checklists||[]).forEach(c=>{
+                                            const d2=(c.date||'').toString().trim(); let iso2='';
+                                            if(/^\d{4}-\d{2}-\d{2}$/.test(d2)) iso2=d2;
+                                            else{const m2=d2.match(/^(\d{2})-(\d{2})-(\d{4})$/);if(m2)iso2=`${m2[3]}-${m2[2]}-${m2[1]}`;}
+                                            if(iso2===date){const cshift=String(c.shift||'').toUpperCase();const wanted=selectedShift.toUpperCase();if(wanted==='ALL'||cshift===wanted){const key=normalizeName(c.operator||'');if(key)clMap2.set(key,c);}}
+                                        });
+                                        const names2=[...(dc.submittedList||[]),...(dc.missing||[])].sort();
+                                        for(const n of names2){const op2=opMap2.get(n)||{};const cl2=clMap2.get(n)||{};const sub2=(dc.submittedList||[]).includes(n);allData.push({Date:date,Operator:displayName(n),Unit:cl2.unitNo||'-',Department:cl2.department||op2.department||'-',Shift:cl2.shift||op2.shift||'-',Status:sub2?'Submitted':'Missing'});}
+                                    }
+                                    if(allData.length===0){alert('No data to export.');return;}
+                                    const ws=XLSX.utils.json_to_sheet(allData);ws['!cols']=[{wch:12},{wch:25},{wch:12},{wch:20},{wch:8},{wch:12}];
+                                    const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Summary');
+                                    XLSX.writeFile(wb,exportDates.length===1?`Compliance_Summary_${exportDates[0]}_${selectedShift}.xlsx`:`Compliance_Summary_${exportDates[0]}_to_${exportDates[exportDates.length-1]}_${selectedShift}.xlsx`);
+                                };
+                                return (
+                                    <div style={{borderTop:'1px solid #e9ecef'}}>
+                                        <div style={{padding:'10px 18px',background:'#f8f9fa',borderBottom:'1px solid #e9ecef',display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px'}}>
+                                            <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                                                <span style={{fontSize:'13px',fontWeight:700,color:'#2c3e50'}}>Submitted: {dateCalc.submittedCount} / Missing: {dateCalc.missingCount}</span>
+                                                <span style={{fontSize:'11px',color:'#7f8c8d',background:'#e9ecef',padding:'2px 8px',borderRadius:'10px'}}>{targetDate} · {selectedShift}</span>
+                                            </div>
+                                            <button onClick={exportToExcel} style={{padding:'5px 14px',fontSize:'12px',background:'#27ae60',color:'white',border:'none',borderRadius:'6px',cursor:'pointer',fontWeight:600}}>📥 Export Excel</button>
                                         </div>
-                                        <div style={{fontSize:'20px'}}>{pill.icon}</div>
+                                        {rows.length===0 ? (<div style={{padding:'20px',textAlign:'center',color:'#7f8c8d'}}>No records found</div>) : (
+                                            <div className="table-wrapper" style={{maxHeight:'50vh',overflowY:'auto'}}>
+                                                <table className="data-table" style={{marginBottom:0,fontSize:'13px',tableLayout:'fixed',width:'100%'}}>
+                                                    <thead style={{position:'sticky',top:0,zIndex:1}}>
+                                                        <tr><th style={{width:'5%'}}>#</th><th style={{width:'28%'}}>Operator</th><th style={{width:'14%'}}>Unit</th><th style={{width:'28%'}}>Department</th><th style={{width:'10%'}}>Shift</th><th style={{width:'15%'}}>Status</th></tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {rows.map((r,i) => (
+                                                            <tr key={r.normalized} onDoubleClick={()=>{setAttSearchStartDate(targetDate);setAttSearchEndDate(targetDate);setShowAttendanceModal(true);}} style={{cursor:'pointer'}} title="Double-click to view attendance details">
+                                                                <td style={{color:'#adb5bd'}}>{i+1}</td>
+                                                                <td style={{fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</td>
+                                                                <td>{r.unit}</td>
+                                                                <td style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.department}</td>
+                                                                <td>{r.shift}</td>
+                                                                <td><span style={{fontSize:'11px',fontWeight:700,color:r.status==='Submitted'?'#27ae60':'#c62828',background:r.status==='Submitted'?'#e8f5e9':'#ffebee',padding:'3px 8px',borderRadius:'10px'}}>{r.status}</span></td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                        <div style={{padding:'6px 16px 10px',fontSize:'11px',color:'#7f8c8d'}}>💡 행 더블클릭 → Attendance 상세</div>
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    )}
+
+                    {/* ══ PANEL: SUBMISSION ══ */}
+                    {activePill === 'submission' && (
+                        <div className="table-card">
+                            <div style={{padding:'12px 18px',background:'#f8f9fa',borderBottom:'1px solid #e9ecef',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'10px'}}>
+                                <span style={{fontSize:'13px',fontWeight:700,color:'#2c3e50'}}>✅ Submission</span>
+                                <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+                                    <label style={{fontSize:'11px',color:'#7f8c8d',fontWeight:600}}>From</label>
+                                    <input type="date" value={selectedDate} onChange={e=>setSelectedDate(e.target.value)} style={{padding:'5px 8px',fontSize:'12px',border:'1px solid #dfe6e9',borderRadius:'6px'}} />
+                                    <label style={{fontSize:'11px',color:'#7f8c8d',fontWeight:600}}>To</label>
+                                    <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} style={{padding:'5px 8px',fontSize:'12px',border:'1px solid #dfe6e9',borderRadius:'6px'}} />
+                                    <label style={{fontSize:'11px',color:'#7f8c8d',fontWeight:600}}>Shift</label>
+                                    <select value={selectedShift} onChange={e=>setSelectedShift(e.target.value)} style={{padding:'5px 8px',fontSize:'12px',border:'1px solid #dfe6e9',borderRadius:'6px',fontWeight:600}}>
+                                        <option value="ALL">All</option><option value="AM">AM</option><option value="PM">PM</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'8px',padding:'14px 18px'}}>
+                                {[
+                                    {key:'PRESENT',   label:'Present',    num:totalOperators,        sub:'operators',    bg:'#f0faf0',border:'#a5d6a7',ab:'#2e7d32',lc:'#2e7d32',as_:'rgba(46,125,50,0.15)'},
+                                    {key:'SUBMITTED', label:'Submitted',   num:submittedCount,        sub:'people',       bg:'#e3f2fd',border:'#90caf9',ab:'#1565c0',lc:'#1565c0',as_:'rgba(21,101,192,0.15)'},
+                                    {key:'MISSING',   label:'Missing',     num:missingCount,          sub:'not submitted',bg:'#ffebee',border:'#ef9a9a',ab:'#c62828',lc:'#c62828',as_:'rgba(198,40,40,0.15)',nc:'#c62828'},
+                                    {key:'CHECKLISTS',label:'Checklists',  num:active.checklistCount, sub:`sheets${active.checklistCount>submittedCount?` (+${active.checklistCount-submittedCount} dup)`:''}`,bg:'#f3e5f5',border:'#ce93d8',ab:'#7b1fa2',lc:'#7b1fa2',as_:'rgba(123,31,162,0.15)'}
+                                ].map(sp => (
+                                    <div key={sp.key} onClick={()=>setSubPillView(sp.key)}
+                                        style={{padding:'11px 14px',borderRadius:'10px',border:subPillView===sp.key?`2px solid ${sp.ab}`:`1.5px solid ${sp.border}`,background:sp.bg,cursor:'pointer',transition:'all 0.15s',userSelect:'none',boxShadow:subPillView===sp.key?`0 0 0 3px ${sp.as_}`:'none'}}>
+                                        <div style={{fontSize:'10px',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',color:sp.lc,marginBottom:'2px'}}>{sp.label}</div>
+                                        <div style={{fontSize:'22px',fontWeight:800,lineHeight:'1.1',color:sp.nc||'#2c3e50'}}>{sp.num}</div>
+                                        <div style={{fontSize:'10px',color:'#95a5a6',marginTop:'2px'}}>{sp.sub}</div>
                                     </div>
                                 ))}
                             </div>
-                        </div>
-
-                        {/* Range summary table - Always show when range is selected */}
-                        {dateList.length > 1 && (
-                            <div style={{margin:'0 20px 10px', border:'1px solid #e9ecef', borderRadius:'8px', overflow:'hidden'}}>
-                                <div style={{padding:'8px 12px', background:'#f8f9fa', fontSize:'13px', fontWeight:600, color:'#2c3e50'}}>Range Summary ({dateList.length} days)</div>
-                                <div className="table-wrapper">
-                                    <table className="data-table" style={{marginBottom:0}}>
-                                        <thead>
-                                            <tr>
-                                                <th>Date</th>
-                                                <th>Present</th>
-                                                <th>Submitted</th>
-                                                <th>Missing</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {rangeStats.map(r => (
-                                                <tr key={r.date}
-                                                    onDoubleClick={() => {
-                                                        setActiveDate(r.date);
-                                                        setListView('SUMMARY');
-                                                    }}
-                                                    style={{cursor: 'pointer'}}
-                                                    title="Double-click to view details">
-                                                    <td><strong>{r.date}</strong></td>
-                                                    <td>{r.allOperatorsCount}</td>
-                                                    <td>{r.submittedCount}</td>
-                                                    <td style={{color: r.missingCount > 0 ? '#c62828' : 'inherit', fontWeight: r.missingCount > 0 ? 700 : 400}}>{r.missingCount}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Show all dates data when range is selected */}
-                        {listView && dateList.length > 1 && (() => {
-                            // For each date in range, show the operator list
-                            return rangeStats.map(dateStat => {
+                            {(() => {
+                                const targetDate = isRange ? activeDate : selectedDate;
+                                const dateCalc = isRange ? (rangeStats.find(r=>r.date===activeDate)||calcForDate(activeDate)) : active;
                                 const operatorMap = new Map();
-                                dataManager.getBankstownOperators().forEach(o => {
-                                    operatorMap.set(normalizeName(o.name || ''), o);
+                                dataManager.getBankstownOperators().forEach(o => operatorMap.set(normalizeName(o.name||''), o));
+                                const checklistMapAll = new Map();
+                                const checklistRows = [];
+                                (dataManager.data.checklists||[]).forEach(c => {
+                                    const d=(c.date||'').toString().trim(); let iso='';
+                                    if(/^\d{4}-\d{2}-\d{2}$/.test(d)) iso=d;
+                                    else{const m2=d.match(/^(\d{2})-(\d{2})-(\d{4})$/);if(m2)iso=`${m2[3]}-${m2[2]}-${m2[1]}`;}
+                                    if(iso===targetDate){const cshift=String(c.shift||'').toUpperCase();const wanted=selectedShift.toUpperCase();if(wanted==='ALL'||cshift===wanted){const key=normalizeName(c.operator||'');if(key){if(!checklistMapAll.has(key))checklistMapAll.set(key,c);checklistRows.push(c);}}}
                                 });
-
-                                // Get checklist info for this specific date+shift
-                                const checklistMap = new Map();
-                                (dataManager.data.checklists || []).forEach(c => {
-                                    const d = (c.date || '').toString().trim();
-                                    let iso = '';
-                                    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) iso = d;
-                                    else {
-                                        const m2 = d.match(/^(\d{2})-(\d{2})-(\d{4})$/);
-                                        if (m2) iso = `${m2[3]}-${m2[2]}-${m2[1]}`;
-                                    }
-                                    if (iso === dateStat.date) {
-                                        const cshift = String(c.shift || '').toUpperCase();
-                                        const wanted = selectedShift.toUpperCase();
-                                        if (wanted === 'ALL' || cshift === wanted) {
-                                            const key = normalizeName(c.operator || '');
-                                            if (key) checklistMap.set(key, c);
-                                        }
-                                    }
-                                });
-
-                                let names = [];
-                                let listTitle = '';
-                                let listColor = '#2c3e50';
-
-                                if (listView === 'SUMMARY') {
-                                    // Show both Submitted and Missing
-                                    const allNames = [...(dateStat.submittedList || []), ...(dateStat.missing || [])].sort();
-                                    names = allNames;
-                                    listTitle = `Summary - Submitted: ${dateStat.submittedList?.length || 0} / Missing: ${dateStat.missing?.length || 0}`;
-                                    listColor = '#2c3e50';
+                                const presentFromAtt=getPresentFromAttendance(targetDate);
+                                const presentOps=intersectSets(presentFromAtt,operatorSet);
+                                let rows=[];
+                                let listTitle='';
+                                if(subPillView==='PRESENT'){
+                                    listTitle=`Present — ${totalOperators} operators`;
+                                    rows=Array.from(presentOps).sort().map(n=>{const op=operatorMap.get(n)||{};const cl=checklistMapAll.get(n)||{};const sub=(dateCalc.submittedList||[]).includes(n);return{name:displayName(n),unit:cl.unitNo||'-',department:cl.department||op.department||'-',shift:cl.shift||op.shift||'-',status:sub?'Submitted':'Missing',normalized:n};});
+                                } else if(subPillView==='SUBMITTED'){
+                                    listTitle=`Submitted — ${submittedCount} people`;
+                                    rows=(dateCalc.submittedList||[]).map(n=>{const op=operatorMap.get(n)||{};const cl=checklistMapAll.get(n)||{};return{name:displayName(n),unit:cl.unitNo||'-',department:cl.department||op.department||'-',shift:cl.shift||op.shift||'-',status:'Submitted',normalized:n};});
+                                } else if(subPillView==='MISSING'){
+                                    listTitle=`Missing — ${missingCount} not submitted`;
+                                    rows=(dateCalc.missing||[]).map(n=>{const op=operatorMap.get(n)||{};return{name:displayName(n),unit:'-',department:op.department||'-',shift:op.shift||'-',status:'Missing',normalized:n};});
                                 } else {
-                                    // Show only present operators for this date
-                                    const presentFromAttendance = getPresentFromAttendance(dateStat.date);
-                                    const presentOps = intersectSets(presentFromAttendance, operatorSet);
-                                    names = Array.from(presentOps).sort();
-                                    listTitle = `Present Today (${names.length})`;
-                                    listColor = '#2c3e50';
+                                    listTitle=`Checklists — ${active.checklistCount} sheets`;
+                                    const countMap=new Map();checklistRows.forEach(c=>{const key=normalizeName(c.operator||'');countMap.set(key,(countMap.get(key)||0)+1);});
+                                    rows=checklistRows.map((c,i)=>{const key=normalizeName(c.operator||'');const cnt=countMap.get(key)||1;return{name:(c.operator||'-')+(cnt>1?' ⚠️':''),unit:c.unitNo||'-',department:c.department||'-',shift:c.shift||'-',status:'Submitted',normalized:key+i};});
                                 }
-
-                                const rows = names.map(n => {
-                                    const op = operatorMap.get(n) || {};
-                                    const cl = checklistMap.get(n) || {};
-                                    const sub = (dateStat.submittedList || []).includes(n);
-                                    return {
-                                        name: displayName(n),
-                                        unit: cl.unitNo || '-',
-                                        department: cl.department || op.department || '-',
-                                        shift: cl.shift || op.shift || '-',
-                                        status: sub ? 'Submitted' : 'Missing',
-                                        normalized: n
-                                    };
-                                });
-
-                                if (rows.length === 0) return null;
-
                                 return (
-                                    <div key={dateStat.date} style={{borderTop:'1px solid #e9ecef', marginBottom:'10px'}}>
-                                        <div style={{padding:'12px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', background:'#f8f9fa'}}>
-                                            <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
-                                                <span style={{fontWeight:700, fontSize:'14px', color: listColor}}>{dateStat.date} - {listTitle}</span>
-                                                <span style={{fontSize:'11px', color:'#7f8c8d', background:'#e9ecef', padding:'2px 8px', borderRadius:'10px'}}>{selectedShift}</span>
+                                    <div style={{borderTop:'1px solid #e9ecef'}}>
+                                        <div style={{padding:'10px 18px',background:'#f8f9fa',borderBottom:'1px solid #e9ecef',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                                            <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                                                <span style={{fontSize:'13px',fontWeight:700,color:'#2c3e50'}}>{listTitle}</span>
+                                                <span style={{fontSize:'11px',color:'#7f8c8d',background:'#e9ecef',padding:'2px 8px',borderRadius:'10px'}}>{targetDate} · {selectedShift}</span>
                                             </div>
                                         </div>
-                                        <div className="table-wrapper" style={{maxHeight:'50vh', overflowY:'auto'}}>
-                                            <table className="data-table" style={{marginBottom:0, fontSize:'13px', tableLayout:'fixed', width:'100%'}}>
-                                                <thead style={{position:'sticky', top:0, zIndex:1}}>
-                                                    <tr>
-                                                        <th style={{width:'5%'}}>#</th>
-                                                        <th style={{width:'28%'}}>Operator</th>
-                                                        <th style={{width:'14%'}}>Unit</th>
-                                                        <th style={{width:'28%'}}>Department</th>
-                                                        <th style={{width:'10%'}}>Shift</th>
-                                                        <th style={{width:'15%'}}>Status</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {rows.map((r, i) => (
-                                                        <tr key={r.normalized}
-                                                            onDoubleClick={() => {
-                                                                setAttSearchStartDate(dateStat.date);
-                                                                setAttSearchEndDate(dateStat.date);
-                                                                setShowAttendanceModal(true);
-                                                            }}
-                                                            style={{cursor: 'pointer'}}
-                                                            title="Double-click to view attendance details">
-                                                            <td style={{color:'#adb5bd'}}>{i+1}</td>
-                                                            <td style={{fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{r.name}</td>
-                                                            <td>{r.unit}</td>
-                                                            <td style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{r.department}</td>
-                                                            <td>{r.shift}</td>
-                                                            <td>
-                                                                <span style={{fontSize:'11px', fontWeight:700, color: r.status === 'Submitted' ? '#27ae60' : '#c62828', background: r.status === 'Submitted' ? '#e8f5e9' : '#ffebee', padding:'3px 8px', borderRadius:'10px'}}>
-                                                                    {r.status}
-                                                                </span>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                        {rows.length===0?(<div style={{padding:'20px',textAlign:'center',color:'#7f8c8d'}}>No records found</div>):(
+                                            <div className="table-wrapper" style={{maxHeight:'50vh',overflowY:'auto'}}>
+                                                <table className="data-table" style={{marginBottom:0,fontSize:'13px',tableLayout:'fixed',width:'100%'}}>
+                                                    <thead style={{position:'sticky',top:0,zIndex:1}}>
+                                                        <tr><th style={{width:'5%'}}>#</th><th style={{width:'28%'}}>Operator</th><th style={{width:'14%'}}>Unit</th><th style={{width:'28%'}}>Department</th><th style={{width:'10%'}}>Shift</th><th style={{width:'15%'}}>Status</th></tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {rows.map((r,i)=>(
+                                                            <tr key={r.normalized} onDoubleClick={()=>{setAttSearchStartDate(targetDate);setAttSearchEndDate(targetDate);setShowAttendanceModal(true);}} style={{cursor:'pointer'}} title="Double-click to view attendance details">
+                                                                <td style={{color:'#adb5bd'}}>{i+1}</td>
+                                                                <td style={{fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</td>
+                                                                <td>{r.unit}</td>
+                                                                <td style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.department}</td>
+                                                                <td>{r.shift}</td>
+                                                                <td><span style={{fontSize:'11px',fontWeight:700,color:r.status==='Submitted'?'#27ae60':'#c62828',background:r.status==='Submitted'?'#e8f5e9':'#ffebee',padding:'3px 8px',borderRadius:'10px'}}>{r.status}</span></td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                        <div style={{padding:'6px 16px 10px',fontSize:'11px',color:'#7f8c8d'}}>💡 행 더블클릭 → Attendance 상세 | ⚠️ 중복 제출</div>
                                     </div>
                                 );
-                            });
-                        })()}
+                            })()}
+                        </div>
+                    )}
 
-                        {/* Single date view - show only when single date selected */}
-                        {listView && dateList.length === 1 && (() => {
-                            // Build rows with operator details
-                            const operatorMap = new Map();
-                            dataManager.getBankstownOperators().forEach(o => {
-                                operatorMap.set(normalizeName(o.name || ''), o);
-                            });
-
-                            // Get checklist info for this date+shift to extract Unit, Department, Shift
-                            const checklistMap = new Map();
-                            (dataManager.data.checklists || []).forEach(c => {
-                                const d = (c.date || '').toString().trim();
-                                let iso = '';
-                                if (/^\d{4}-\d{2}-\d{2}$/.test(d)) iso = d;
-                                else {
-                                    const m2 = d.match(/^(\d{2})-(\d{2})-(\d{4})$/);
-                                    if (m2) iso = `${m2[3]}-${m2[2]}-${m2[1]}`;
-                                }
-                                if (iso === active.date) {
-                                    const cshift = String(c.shift || '').toUpperCase();
-                                    const wanted = selectedShift.toUpperCase();
-                                    if (wanted === 'ALL' || cshift === wanted) {
-                                        const key = normalizeName(c.operator || '');
-                                        if (key) checklistMap.set(key, c);
-                                    }
-                                }
-                            });
-
-                            let names = [];
-                            let listTitle = '';
-                            let listColor = '#2c3e50';
-
-                            if (listView === 'SUMMARY') {
-                                // Show both Submitted and Missing
-                                const allNames = [...(active.submittedList || []), ...(active.missing || [])].sort();
-                                names = allNames;
-                                listTitle = `Summary - Submitted: ${active.submittedList?.length || 0} / Missing: ${active.missing?.length || 0}`;
-                                listColor = '#2c3e50';
-                            } else {
-                                // Show only present operators for this date
-                                const presentFromAttendance = getPresentFromAttendance(active.date);
-                                const presentOps = intersectSets(presentFromAttendance, operatorSet);
-                                names = Array.from(presentOps).sort();
-                                listTitle = `Present Today (${names.length})`;
-                                listColor = '#2c3e50';
-                            }
-
-                            const rows = names.map(n => {
-                                const op = operatorMap.get(n) || {};
-                                const cl = checklistMap.get(n) || {};
-                                const sub = (active.submittedList || []).includes(n);
-                                return {
-                                    name: displayName(n),
-                                    unit: cl.unitNo || '-',
-                                    department: cl.department || op.department || '-',
-                                    shift: cl.shift || op.shift || '-',
-                                    status: sub ? 'Submitted' : 'Missing',
-                                    normalized: n
-                                };
-                            });
-
-                            const exportToExcel = () => {
-                                // Ask user for export type
-                                const exportType = prompt('Export Type:\n1. Single Date\n2. Date Range\n\nEnter 1 or 2:', '1');
-                                if (!exportType) return; // User cancelled
-                                
-                                let exportDates = [];
-                                
-                                if (exportType === '1') {
-                                    // Single date
-                                    const singleDate = prompt('Enter Date (YYYY-MM-DD):', active.date);
-                                    if (!singleDate) return;
-                                    
-                                    if (!/^\d{4}-\d{2}-\d{2}$/.test(singleDate)) {
-                                        alert('Invalid date format. Please use YYYY-MM-DD format.');
-                                        return;
-                                    }
-                                    
-                                    exportDates = [singleDate];
-                                } else if (exportType === '2') {
-                                    // Date range
-                                    const exportStart = prompt('Export Start Date (YYYY-MM-DD):', active.date);
-                                    if (!exportStart) return;
-                                    
-                                    const exportEnd = prompt('Export End Date (YYYY-MM-DD):', active.date);
-                                    if (!exportEnd) return;
-                                    
-                                    if (!/^\d{4}-\d{2}-\d{2}$/.test(exportStart) || !/^\d{4}-\d{2}-\d{2}$/.test(exportEnd)) {
-                                        alert('Invalid date format. Please use YYYY-MM-DD format.');
-                                        return;
-                                    }
-                                    
-                                    exportDates = enumerateDates(exportStart, exportEnd);
-                                } else {
-                                    alert('Invalid selection. Please enter 1 or 2.');
-                                    return;
-                                }
-                                
-                                if (exportDates.length === 0) {
-                                    alert('No valid dates selected.');
-                                    return;
-                                }
-                                
-                                // Collect data for all dates
-                                const allData = [];
-                                for (const date of exportDates) {
-                                    const dateCalc = calcForDate(date);
-                                    
-                                    // Get operator details for this date
-                                    const operatorMap = new Map();
-                                    dataManager.getBankstownOperators().forEach(o => {
-                                        operatorMap.set(normalizeName(o.name || ''), o);
-                                    });
-                                    
-                                    const checklistMap = new Map();
-                                    (dataManager.data.checklists || []).forEach(c => {
-                                        const d = (c.date || '').toString().trim();
-                                        let iso = '';
-                                        if (/^\d{4}-\d{2}-\d{2}$/.test(d)) iso = d;
-                                        else {
-                                            const m2 = d.match(/^(\d{2})-(\d{2})-(\d{4})$/);
-                                            if (m2) iso = `${m2[3]}-${m2[2]}-${m2[1]}`;
-                                        }
-                                        if (iso === date) {
-                                            const cshift = String(c.shift || '').toUpperCase();
-                                            const wanted = selectedShift.toUpperCase();
-                                            if (wanted === 'ALL' || cshift === wanted) {
-                                                const key = normalizeName(c.operator || '');
-                                                if (key) checklistMap.set(key, c);
-                                            }
-                                        }
-                                    });
-                                    
-                                    // Determine which names to export based on current listView
-                                    let namesToExport = [];
-                                    if (listView === 'MISSING') {
-                                        namesToExport = dateCalc.missing || [];
-                                    } else if (listView === 'SUBMITTED') {
-                                        namesToExport = dateCalc.submittedList || [];
-                                    } else {
-                                        // ALL: Show present operators
-                                        const presentFromAttendance = getPresentFromAttendance(date);
-                                        const presentOps = intersectSets(presentFromAttendance, operatorSet);
-                                        namesToExport = Array.from(presentOps).sort();
-                                    }
-                                    
-                                    // Build rows for this date
-                                    for (const n of namesToExport) {
-                                        const op = operatorMap.get(n) || {};
-                                        const cl = checklistMap.get(n) || {};
-                                        const sub = (dateCalc.submittedList || []).includes(n);
-                                        allData.push({
-                                            date: date,
-                                            name: displayName(n),
-                                            unit: cl.unitNo || '-',
-                                            department: cl.department || op.department || '-',
-                                            shift: cl.shift || op.shift || '-',
-                                            status: sub ? 'Submitted' : 'Missing'
-                                        });
-                                    }
-                                }
-                                
-                                if (allData.length === 0) {
-                                    alert('No data to export for selected date(s).');
-                                    return;
-                                }
-                                
-                                // Create Excel
-                                const header = ['Date', 'Operator', 'Unit', 'Department', 'Shift', 'Status'];
-                                const data = allData.map((r, i) => [r.date, r.name, r.unit, r.department, r.shift, r.status]);
-                                const ws = XLSX.utils.aoa_to_sheet([header, ...data]);
-                                ws['!cols'] = [{wch:12},{wch:25},{wch:12},{wch:20},{wch:8},{wch:12}];
-                                const wb = XLSX.utils.book_new();
-                                XLSX.utils.book_append_sheet(wb, ws, listView);
-                                
-                                // Filename based on export type
-                                const filename = exportDates.length === 1 
-                                    ? `Compliance_${listView}_${exportDates[0]}_${selectedShift}.xlsx`
-                                    : `Compliance_${listView}_${exportDates[0]}_to_${exportDates[exportDates.length-1]}_${selectedShift}.xlsx`;
-                                
-                                XLSX.writeFile(wb, filename);
-                            };
-
-                            return (
-                                <div style={{borderTop:'1px solid #e9ecef'}}>
-                                    <div style={{padding:'12px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', background:'#f8f9fa'}}>
-                                        <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
-                                            <span style={{fontWeight:700, fontSize:'14px', color: listColor}}>{listTitle}</span>
-                                            <span style={{fontSize:'11px', color:'#7f8c8d', background:'#e9ecef', padding:'2px 8px', borderRadius:'10px'}}>{active.date} · {selectedShift}</span>
-                                        </div>
-                                        <button onClick={exportToExcel} style={{padding:'5px 14px', fontSize:'12px', background:'#27ae60', color:'white', border:'none', borderRadius:'6px', cursor:'pointer', fontWeight:600}}>
-                                            📥 Export Excel
-                                        </button>
-                                    </div>
-                                    {rows.length === 0 ? (
-                                        <div style={{padding:'20px', textAlign:'center', color:'#7f8c8d'}}>No records found</div>
-                                    ) : (
-                                        <div className="table-wrapper" style={{maxHeight:'50vh', overflowY:'auto'}}>
-                                            <table className="data-table" style={{marginBottom:0, fontSize:'13px', tableLayout:'fixed', width:'100%'}}>
-                                                <thead style={{position:'sticky', top:0, zIndex:1}}>
-                                                    <tr>
-                                                        <th style={{width:'5%'}}>#</th>
-                                                        <th style={{width:'28%'}}>Operator</th>
-                                                        <th style={{width:'14%'}}>Unit</th>
-                                                        <th style={{width:'28%'}}>Department</th>
-                                                        <th style={{width:'10%'}}>Shift</th>
-                                                        <th style={{width:'15%'}}>Status</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {rows.map((r, i) => (
-                                                        <tr key={r.normalized}
-                                                            onDoubleClick={() => {
-                                                                setAttSearchStartDate(active.date);
-                                                                setAttSearchEndDate(active.date);
-                                                                setShowAttendanceModal(true);
-                                                            }}
-                                                            style={{cursor: 'pointer'}}
-                                                            title="Double-click to view attendance details">
-                                                            <td style={{color:'#adb5bd'}}>{i+1}</td>
-                                                            <td style={{fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{r.name}</td>
-                                                            <td>{r.unit}</td>
-                                                            <td style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{r.department}</td>
-                                                            <td>{r.shift}</td>
-                                                            <td>
-                                                                <span style={{fontSize:'11px', fontWeight:700, color: r.status === 'Submitted' ? '#27ae60' : '#c62828', background: r.status === 'Submitted' ? '#e8f5e9' : '#ffebee', padding:'3px 8px', borderRadius:'10px'}}>
-                                                                    {r.status}
-                                                                </span>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    )}
+                    {/* ══ PANEL: ATTENDANCE ══ */}
+                    {activePill === 'attendance' && (
+                        <div className="table-card">
+                            <div style={{padding:'12px 18px',background:'#f8f9fa',borderBottom:'1px solid #e9ecef',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'10px'}}>
+                                <span style={{fontSize:'13px',fontWeight:700,color:'#2c3e50'}}>📋 Attendance</span>
+                                <button className="btn btn-success" onClick={()=>setShowAttendanceModal(true)} style={{fontSize:'12px',padding:'5px 14px'}}>📋 Open Full Attendance</button>
+                            </div>
+                            <div style={{padding:'14px 18px 10px',display:'flex',gap:'10px',flexWrap:'wrap',alignItems:'flex-end'}}>
+                                <div style={{minWidth:'140px'}}>
+                                    <label style={{display:'block',fontSize:'12px',fontWeight:600,color:'#7f8c8d',marginBottom:'4px'}}>From Date</label>
+                                    <input type="date" value={attSearchStartDate} onChange={e=>setAttSearchStartDate(e.target.value)} style={{width:'100%',padding:'8px 12px',border:'1px solid #dfe6e9',borderRadius:'6px',fontSize:'13px'}} />
                                 </div>
-                            );
-                        })()}
-                    </div>
+                                <div style={{minWidth:'140px'}}>
+                                    <label style={{display:'block',fontSize:'12px',fontWeight:600,color:'#7f8c8d',marginBottom:'4px'}}>To Date</label>
+                                    <input type="date" value={attSearchEndDate} onChange={e=>setAttSearchEndDate(e.target.value)} style={{width:'100%',padding:'8px 12px',border:'1px solid #dfe6e9',borderRadius:'6px',fontSize:'13px'}} />
+                                </div>
+                                <div style={{minWidth:'180px'}}>
+                                    <label style={{display:'block',fontSize:'12px',fontWeight:600,color:'#7f8c8d',marginBottom:'4px'}}>Operator</label>
+                                    <select value={attSearchOperator} onChange={e=>setAttSearchOperator(e.target.value)} style={{width:'100%',padding:'8px 12px',border:'1px solid #dfe6e9',borderRadius:'6px',fontSize:'13px',fontWeight:600}}>
+                                        <option value="ALL">All Operators</option>
+                                        {[...new Set(dataManager.getBankstownOperators().map(o=>o.name))].sort().map(name=>(<option key={name} value={name}>{name}</option>))}
+                                    </select>
+                                </div>
+                                <div style={{minWidth:'150px'}}>
+                                    <label style={{display:'block',fontSize:'12px',fontWeight:600,color:'#7f8c8d',marginBottom:'4px'}}>Department</label>
+                                    <select value={attSearchDepartment} onChange={e=>setAttSearchDepartment(e.target.value)} style={{width:'100%',padding:'8px 12px',border:'1px solid #dfe6e9',borderRadius:'6px',fontSize:'13px',fontWeight:600}}>
+                                        <option value="ALL">All Departments</option>
+                                        {[...new Set(dataManager.getBankstownOperators().map(o=>o.department).filter(d=>d))].sort().map(dept=>(<option key={dept} value={dept}>{dept}</option>))}
+                                    </select>
+                                </div>
+                                <div style={{minWidth:'100px'}}>
+                                    <label style={{display:'block',fontSize:'12px',fontWeight:600,color:'#7f8c8d',marginBottom:'4px'}}>Shift</label>
+                                    <select value={attSearchShift} onChange={e=>setAttSearchShift(e.target.value)} style={{width:'100%',padding:'8px 12px',border:'1px solid #dfe6e9',borderRadius:'6px',fontSize:'13px',fontWeight:600}}>
+                                        <option value="ALL">All</option><option value="AM">AM</option><option value="PM">PM</option>
+                                    </select>
+                                </div>
+                                <div style={{minWidth:'120px'}}>
+                                    <label style={{display:'block',fontSize:'12px',fontWeight:600,color:'#7f8c8d',marginBottom:'4px'}}>Attendance</label>
+                                    <select value={attSearchAttendance} onChange={e=>setAttSearchAttendance(e.target.value)} style={{width:'100%',padding:'8px 12px',border:'1px solid #dfe6e9',borderRadius:'6px',fontSize:'13px',fontWeight:600}}>
+                                        <option value="ALL">All</option><option value="Present">Present</option><option value="Absent">Absent</option>
+                                    </select>
+                                </div>
+                                <div style={{minWidth:'130px'}}>
+                                    <label style={{display:'block',fontSize:'12px',fontWeight:600,color:'#7f8c8d',marginBottom:'4px'}}>Status</label>
+                                    <select value={attSearchStatus} onChange={e=>setAttSearchStatus(e.target.value)} style={{width:'100%',padding:'8px 12px',border:'1px solid #dfe6e9',borderRadius:'6px',fontSize:'13px',fontWeight:600}}>
+                                        <option value="ALL">All</option><option value="Submitted">Submitted</option><option value="Missing">Missing</option><option value="N/A">N/A</option><option value="Inactive">Inactive</option>
+                                    </select>
+                                </div>
+                                <button className="btn btn-secondary" onClick={()=>{setAttSearchOperator('ALL');setAttSearchDepartment('ALL');setAttSearchShift('ALL');setAttSearchAttendance('ALL');setAttSearchStatus('ALL');setAttSearchStartDate('');setAttSearchEndDate('');}} style={{padding:'8px 14px',fontSize:'13px',alignSelf:'flex-end'}}>Clear</button>
+                            </div>
+                            <div style={{padding:'6px 18px 14px',fontSize:'13px',color:'#7f8c8d'}}>
+                                Filters apply to the Full Attendance view. Click <strong style={{color:'#2c3e50'}}>Open Full Attendance</strong> to see the complete table with export and long-absence alerts.
+                            </div>
+                        </div>
+                    )}
 
                     {/* Attendance Records Modal */}
                     {showAttendanceModal && (
@@ -5348,6 +5267,7 @@ return (
             );
         }
 
+        
         function Settings() {
             const [activeTab, setActiveTab] = useState('user-management');
             const [users, setUsers] = useState(() => dataManager.data.users || []);
