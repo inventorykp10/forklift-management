@@ -1080,15 +1080,16 @@ class DataManager {
                 // Forklifts의 경우 컬럼 순서 지정
                 if (dataType === 'forklifts') {
                     data = data.map(f => ({
+                        'Group': f.group || '',
+                        'Site': f.site || '',
                         'Unit No': f.unitNo,
                         'Type': f.type,
+                        'Specification': f.specification || '',
                         'Manufacturer': f.manufacturer || '',
                         'Model': f.model || '',
-                        'Serial No (S/N)': f.serialNo || '',
-                        'Specification': f.specification || '',
-                        'Site': f.site || '',
-                        'Group': f.group || '',
+                        'Serial No': f.serialNo || '',
                         'Status': f.status || '',
+                        'Date of Commission': f.commissionDate || '',
                         'Notes': f.notes || ''
                     }));
                 }
@@ -1256,7 +1257,7 @@ class DataManager {
                             <img src={IMAGES.companyLogo} alt="Samsung SDS Cello" className="login-company-logo" />
                             <img src={IMAGES.forkliftIcon} alt="Icon" className="login-logo-img" />
                             <h1>Total Facilities Management System</h1>
-                            <span className="v3-badge">V1.2.0</span>
+                            <span className="v3-badge">V1.2.1</span>
                         </div>
                         
                         <div className="welcome-message">
@@ -1297,7 +1298,7 @@ class DataManager {
                     <div className="sidebar-header">
                         <img src={IMAGES.forkliftIcon} alt="Icon" className="sidebar-icon" />
                         <div className="sidebar-logo">Total FMS</div>
-                        <div style={{fontSize:'11px',color:'rgba(255,255,255,0.45)',marginTop:'4px',letterSpacing:'0.5px'}}>V1.2.0</div>
+                        <div style={{fontSize:'11px',color:'rgba(255,255,255,0.45)',marginTop:'4px',letterSpacing:'0.5px'}}>V1.2.1</div>
                         <img src={IMAGES.samsungLogo} alt="Logo" className="sidebar-header-logo" />
                     </div>
                     
@@ -3699,8 +3700,6 @@ class DataManager {
             const [detailForklift, setDetailForklift] = React.useState(null);
             const [searchTerm, setSearchTerm] = React.useState('');
             const [filterType, setFilterType] = React.useState('all');
-            const [currentPage, setCurrentPage] = React.useState(1);
-            const itemsPerPage = 20;
 
             const filteredForklifts = forklifts.filter(f => {
                 const q = searchTerm.toLowerCase();
@@ -3713,9 +3712,6 @@ class DataManager {
                 return matchesSearch && matchesFilter;
             });
 
-            const totalPages = Math.ceil(filteredForklifts.length / itemsPerPage);
-            const startIdx = (currentPage - 1) * itemsPerPage;
-            const paginatedForklifts = filteredForklifts.slice(startIdx, startIdx + itemsPerPage);
             const uniqueTypes = [...new Set(forklifts.map(f => f.type).filter(Boolean))];
 
             const handleAdd = () => { setEditingForklift(null); setShowModal(true); };
@@ -3740,7 +3736,7 @@ class DataManager {
                 <div>
                     <div className="content-header">
                         <div className="content-header-left">
-                            <h1>Forklift Fleet Management <span className="v3-badge">V1.2.0</span></h1>
+                            <h1>Forklift Fleet Management <span className="v3-badge">V1.2.1</span></h1>
                             <p>Samsung SDS Cello Bankstown — {filteredForklifts.length} Units</p>
                         </div>
                         <div className="content-header-right">
@@ -3761,16 +3757,16 @@ class DataManager {
                             <div className="search-box">
                                 <span className="search-icon">🔍</span>
                                 <input type="text" placeholder="Search unit, type, S/N, model..." value={searchTerm}
-                                    onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }} />
+                                    onChange={e => { setSearchTerm(e.target.value); }} />
                                 {searchTerm && <button onClick={() => setSearchTerm('')} style={{position:'absolute',right:'10px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:'18px',color:'#95a5a6'}}>✕</button>}
                             </div>
-                            <select className="filter-select" value={filterType} onChange={e => { setFilterType(e.target.value); setCurrentPage(1); }}>
+                            <select className="filter-select" value={filterType} onChange={e => { setFilterType(e.target.value); }}>
                                 <option value="all">All Types</option>
                                 {uniqueTypes.map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
                         </div>
 
-                        <div className="table-wrapper">
+                        <div className="table-wrapper" style={{maxHeight:'60vh',overflowY:'auto'}}>
                             <table className="data-table">
                                 <thead>
                                     <tr>
@@ -3782,7 +3778,7 @@ class DataManager {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {paginatedForklifts.map(f => (
+                                    {filteredForklifts.map(f => (
                                         <tr key={f.id}
                                             onDoubleClick={() => setDetailForklift(f)}
                                             style={{cursor:'pointer'}}
@@ -3802,14 +3798,6 @@ class DataManager {
                                 </tbody>
                             </table>
                         </div>
-
-                        {totalPages > 1 && (
-                            <div className="pagination">
-                                <button className="page-btn" onClick={() => setCurrentPage(Math.max(1, currentPage-1))} disabled={currentPage===1}>← Prev</button>
-                                <span>Page {currentPage} of {totalPages}</span>
-                                <button className="page-btn" onClick={() => setCurrentPage(Math.min(totalPages, currentPage+1))} disabled={currentPage===totalPages}>Next →</button>
-                            </div>
-                        )}
                     </div>
 
                     {/* ── Detail Panel (double-click) ── */}
@@ -3861,6 +3849,10 @@ class DataManager {
                                             <span style={labelStyle}>Group</span>
                                             <div style={valStyle}>{detailForklift.group || '—'}</div>
                                         </div>
+                                        <div>
+                                            <span style={labelStyle}>Date of Commission</span>
+                                            <div style={valStyle}>{detailForklift.commissionDate || '—'}</div>
+                                        </div>
                                         {detailForklift.notes && (
                                             <div style={{gridColumn:'1/-1'}}>
                                                 <span style={labelStyle}>Notes</span>
@@ -3888,7 +3880,7 @@ class DataManager {
         function ForkliftModal({ forklift, onSave, onClose }) {
             const [formData, setFormData] = React.useState(forklift || {
                 unitNo:'', group:'SDSAU', site:'Bankstown', type:'', specification:'',
-                serialNo:'', model:'', manufacturer:'', status:'Active', notes:''
+                serialNo:'', model:'', manufacturer:'', commissionDate:'', status:'Active', notes:''
             });
             const handleSubmit = (e) => { e.preventDefault(); onSave(formData); };
             const fd = (k,v) => setFormData({...formData, [k]:v});
@@ -3966,7 +3958,10 @@ class DataManager {
                                             <option value="Retired">Retired</option>
                                         </select>
                                     </div>
-                                    <div className="form-field" />
+                                    <div className="form-field">
+                                        <label>Date of Commission</label>
+                                        <input type="date" value={formData.commissionDate||''} onChange={e=>fd('commissionDate',e.target.value)} />
+                                    </div>
                                 </div>
                                 <div className="form-row">
                                     <div className="form-field" style={{flex:'1 1 100%'}}>
